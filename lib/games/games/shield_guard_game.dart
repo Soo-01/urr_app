@@ -13,6 +13,10 @@ import '../game_base.dart';
 import '../game_motor_controller.dart';
 import '../game_result_screen.dart';
 
+import 'dart:typed_data';
+import 'dart:convert';  // utf8.encode 사용을 위해 추가
+
+
 // ============================================================================
 // [S3] 방패 막기 (Shield Guard)
 // 관절: 어깨 굽힘/폄 (lShoulderEF)
@@ -629,6 +633,7 @@ class _ShieldGuardGameState extends State<ShieldGuardGame> {
     _isSim = !widget.bluetoothService.isConnected();
     _motor = GameMotorController(bt: widget.bluetoothService);
 
+    // Jetson으로부터 전송되는 모터 [0]번의 Pos 데이터를 파싱하여 높이 매핑
     final stream = _isSim
         ? null
         : widget.bluetoothService.dataStream
@@ -652,7 +657,20 @@ class _ShieldGuardGameState extends State<ShieldGuardGame> {
     );
 
     if (!_isSim) {
-      _motor.selectJoint(widget.config.bodyPart);
+      // --- 게임 시작 시 자동 명령 전송 부분 수정 ---
+      try {
+        // 1. 0번 모터(rShoulderEF)를 타겟으로 지정
+        widget.bluetoothService.sendBytes(Uint8List.fromList(utf8.encode("PART:rShoulderEF\n")));
+        
+        // 2. 약간의 딜레이(100ms) 후 arom 모드 실행
+        // (블루투스 직렬 통신에서 명령이 겹치지 않도록 방지)
+        Future.delayed(const Duration(milliseconds: 100), () {
+          widget.bluetoothService.sendBytes(Uint8List.fromList(utf8.encode("arom\n")));
+        });
+      } catch (e) {
+        debugPrint("Bluetooth Send Error: $e");
+      }
+      
       _motor.startWatchdog();
     }
   }
