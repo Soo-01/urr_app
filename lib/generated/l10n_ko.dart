@@ -388,4 +388,156 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get enterPwd => '비밀번호 입력';
+
+  @override
+  String get game => '게임';
+
+  @override
+  String get skyGardener => '하늘 정원사';
+
+  @override
+  String get skyGardenerDesc => '하늘 정원사 게임 설명';
+
+  @override
+  String get cloudPainter => '구름 화가';
+
+  @override
+  String get cloudPainterDesc => '구름 화가 게임 설명';
+
+  @override
+  String get shieldGuard => '방패 수비대';
+
+  @override
+  String get shieldGuardDesc => '방패 수비대 게임 설명';
+
+  @override
+  String get safeCracker => '금고털이';
+
+  @override
+  String get safeCrackerDesc => '금고털이 게임 설명';
+
+  @override
+  String get targetReaching => '목표 도달';
+
+  @override
+  String get targetReachingDesc => '목표 도달 게임 설명';
+
+  @override
+  String get swimming => '수영';
+
+  @override
+  String get swimmingDesc => '수영 게임 설명';
+
+  @override
+  String get balloonPop => '풍선 터뜨리기';
+
+  @override
+  String get balloonPopDesc => '풍선 터뜨리기 게임 설명';
+
+  @override
+  String get carpenter => '목수';
+
+  @override
+  String get carpenterDesc => '목수 게임 설명';
+
+  @override
+  String get potionMaker => '포션 제조';
+
+  @override
+  String get potionMakerDesc => '포션 제조 게임 설명';
+
+  @override
+  String get mealHelper => '식사 도우미';
+
+  @override
+  String get mealHelperDesc => '식사 도우미 게임 설명';
+
+  @override
+  String get trackingGame => '추적 게임';
+
+  @override
+  String get trackingGameDesc => '추적 게임 설명';
+
+  @override
+  String get bowling => '볼링';
+
+  @override
+  String get bowlingDesc => '볼링 게임 설명';
+
+  @override
+  String get rehabGames => '재활 게임';
+
+  @override
+  String get categoryShoulder => '어깨';
+
+  @override
+  String get categoryElbow => '팔꿈치';
+
+  @override
+  String get categoryCombined => '복합';
+
+  @override
+  String get startGame => '게임 시작';
+
+  @override
+  String get brunnstromStage => '브룬스트롬 단계';
+
+  @override
+  String get cognitiveLevel => '인지 수준';
+
+  @override
+  String get neglectSide => '편측 무시';
+
+  @override
+  String get neglectNone => '없음';
+
+  @override
+  String get neglectLeft => '좌측';
+
+  @override
+  String get neglectRight => '우측';
+
+  @override
+  String get selectDifficulty => '난이도 선택';
+
+  @override
+  String get gameDuration => '게임 시간';
+
+  @override
+  String seconds(int count) {
+    return '$count초';
+  }
+
+  @override
+  String get pauseGame => '게임 일시정지';
+
+  @override
+  String get sessionResult => '세션 결과';
+
+  @override
+  String get gameOver => '게임 종료';
+
+  @override
+  String get finalScore => '최종 점수';
+
+  @override
+  String get gameAccuracy => '정확도';
+
+  @override
+  String get hits => '성공';
+
+  @override
+  String get misses => '실패';
+
+  @override
+  String get sessionDuration => '진행 시간';
+
+  @override
+  String get difficultyLevel => '난이도';
+
+  @override
+  String get backToHub => '허브로 돌아가기';
+
+  @override
+  String get playAgain => '다시 하기';
 }

@@ -142,6 +142,66 @@
   "cancel": "취소",
   "confirm": "확인",
   "loadUserInfo": "정보 불러오기",
-  "enterPwd": "비밀번호 입력"
+  "enterPwd": "비밀번호 입력",
+
+  "game": "게임",
+
+
+  "skyGardener": "하늘 정원사",
+  "skyGardenerDesc": "하늘 정원사 게임 설명",
+  "cloudPainter": "구름 화가",
+  "cloudPainterDesc": "구름 화가 게임 설명",
+  "shieldGuard": "방패 수비대",
+  "shieldGuardDesc": "방패 수비대 게임 설명",
+  "safeCracker": "금고털이",
+  "safeCrackerDesc": "금고털이 게임 설명",
+  "targetReaching": "목표 도달",
+  "targetReachingDesc": "목표 도달 게임 설명",
+  "swimming": "수영",
+  "swimmingDesc": "수영 게임 설명",
+  "balloonPop": "풍선 터뜨리기",
+  "balloonPopDesc": "풍선 터뜨리기 게임 설명",
+  "carpenter": "목수",
+  "carpenterDesc": "목수 게임 설명",
+  "potionMaker": "포션 제조",
+  "potionMakerDesc": "포션 제조 게임 설명",
+  "mealHelper": "식사 도우미",
+  "mealHelperDesc": "식사 도우미 게임 설명",
+  "trackingGame": "추적 게임",
+  "trackingGameDesc": "추적 게임 설명",
+  "bowling": "볼링",
+  "bowlingDesc": "볼링 게임 설명",
+  "rehabGames": "재활 게임",
+  "categoryShoulder": "어깨",
+  "categoryElbow": "팔꿈치",
+  "categoryCombined": "복합",
+  "startGame": "게임 시작",
+  "brunnstromStage": "브룬스트롬 단계",
+  "cognitiveLevel": "인지 수준",
+  "neglectSide": "편측 무시",
+  "neglectNone": "없음",
+  "neglectLeft": "좌측",
+  "neglectRight": "우측",
+  "selectDifficulty": "난이도 선택",
+  "gameDuration": "게임 시간",
+  "seconds": "{count}초",
+  "@seconds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pauseGame": "게임 일시정지",
+  "sessionResult": "세션 결과",
+  "gameOver": "게임 종료",
+  "finalScore": "최종 점수",
+  "gameAccuracy": "정확도",
+  "hits": "성공",
+  "misses": "실패",
+  "sessionDuration": "진행 시간",
+  "difficultyLevel": "난이도",
+  "backToHub": "허브로 돌아가기",
+  "playAgain": "다시 하기"
 
 }

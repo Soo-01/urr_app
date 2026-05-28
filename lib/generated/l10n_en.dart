@@ -389,4 +389,156 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get enterPwd => 'Enter Password';
+
+  @override
+  String get game => 'Game';
+
+  @override
+  String get skyGardener => 'Sky Gardener';
+
+  @override
+  String get skyGardenerDesc => 'Sky Gardener Description';
+
+  @override
+  String get cloudPainter => 'Cloud Painter';
+
+  @override
+  String get cloudPainterDesc => 'Cloud Painter Description';
+
+  @override
+  String get shieldGuard => 'Shield Guard';
+
+  @override
+  String get shieldGuardDesc => 'Shield Guard Description';
+
+  @override
+  String get safeCracker => 'Safe Cracker';
+
+  @override
+  String get safeCrackerDesc => 'Safe Cracker Description';
+
+  @override
+  String get targetReaching => 'Target Reaching';
+
+  @override
+  String get targetReachingDesc => 'Target Reaching Description';
+
+  @override
+  String get swimming => 'Swimming';
+
+  @override
+  String get swimmingDesc => 'Swimming Description';
+
+  @override
+  String get balloonPop => 'Balloon Pop';
+
+  @override
+  String get balloonPopDesc => 'Balloon Pop Description';
+
+  @override
+  String get carpenter => 'Carpenter';
+
+  @override
+  String get carpenterDesc => 'Carpenter Description';
+
+  @override
+  String get potionMaker => 'Potion Maker';
+
+  @override
+  String get potionMakerDesc => 'Potion Maker Description';
+
+  @override
+  String get mealHelper => 'Meal Helper';
+
+  @override
+  String get mealHelperDesc => 'Meal Helper Description';
+
+  @override
+  String get trackingGame => 'Tracking Game';
+
+  @override
+  String get trackingGameDesc => 'Tracking Game Description';
+
+  @override
+  String get bowling => 'Bowling';
+
+  @override
+  String get bowlingDesc => 'Bowling Description';
+
+  @override
+  String get rehabGames => 'Rehab Games';
+
+  @override
+  String get categoryShoulder => 'Shoulder';
+
+  @override
+  String get categoryElbow => 'Elbow';
+
+  @override
+  String get categoryCombined => 'Combined';
+
+  @override
+  String get startGame => 'Start Game';
+
+  @override
+  String get brunnstromStage => 'Brunnstrom Stage';
+
+  @override
+  String get cognitiveLevel => 'Cognitive Level';
+
+  @override
+  String get neglectSide => 'Neglect Side';
+
+  @override
+  String get neglectNone => 'None';
+
+  @override
+  String get neglectLeft => 'Left';
+
+  @override
+  String get neglectRight => 'Right';
+
+  @override
+  String get selectDifficulty => 'Select Difficulty';
+
+  @override
+  String get gameDuration => 'Game Duration';
+
+  @override
+  String seconds(int count) {
+    return '${count}s';
+  }
+
+  @override
+  String get pauseGame => 'Pause Game';
+
+  @override
+  String get sessionResult => 'Session Result';
+
+  @override
+  String get gameOver => 'Game Over';
+
+  @override
+  String get finalScore => 'Final Score';
+
+  @override
+  String get gameAccuracy => 'Accuracy';
+
+  @override
+  String get hits => 'Hits';
+
+  @override
+  String get misses => 'Misses';
+
+  @override
+  String get sessionDuration => 'Duration';
+
+  @override
+  String get difficultyLevel => 'Difficulty';
+
+  @override
+  String get backToHub => 'Back to Hub';
+
+  @override
+  String get playAgain => 'Play Again';
 }

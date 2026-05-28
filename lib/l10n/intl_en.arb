@@ -142,5 +142,66 @@
   "cancel": "Cancel",
   "confirm": "Confirm",
   "loadUserInfo": "Load Information",
-  "enterPwd": "Enter Password"
+  "enterPwd": "Enter Password",
+
+  "game": "Game",
+
+  
+  "skyGardener": "Sky Gardener",
+  "skyGardenerDesc": "Sky Gardener Description",
+  "cloudPainter": "Cloud Painter",
+  "cloudPainterDesc": "Cloud Painter Description",
+  "shieldGuard": "Shield Guard",
+  "shieldGuardDesc": "Shield Guard Description",
+  "safeCracker": "Safe Cracker",
+  "safeCrackerDesc": "Safe Cracker Description",
+  "targetReaching": "Target Reaching",
+  "targetReachingDesc": "Target Reaching Description",
+  "swimming": "Swimming",
+  "swimmingDesc": "Swimming Description",
+  "balloonPop": "Balloon Pop",
+  "balloonPopDesc": "Balloon Pop Description",
+  "carpenter": "Carpenter",
+  "carpenterDesc": "Carpenter Description",
+  "potionMaker": "Potion Maker",
+  "potionMakerDesc": "Potion Maker Description",
+  "mealHelper": "Meal Helper",
+  "mealHelperDesc": "Meal Helper Description",
+  "trackingGame": "Tracking Game",
+  "trackingGameDesc": "Tracking Game Description",
+  "bowling": "Bowling",
+  "bowlingDesc": "Bowling Description",
+  "rehabGames": "Rehab Games",
+  "categoryShoulder": "Shoulder",
+  "categoryElbow": "Elbow",
+  "categoryCombined": "Combined",
+  "startGame": "Start Game",
+  "brunnstromStage": "Brunnstrom Stage",
+  "cognitiveLevel": "Cognitive Level",
+  "neglectSide": "Neglect Side",
+  "neglectNone": "None",
+  "neglectLeft": "Left",
+  "neglectRight": "Right",
+  "selectDifficulty": "Select Difficulty",
+  "gameDuration": "Game Duration",
+  "seconds": "{count}s",
+  "@seconds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pauseGame": "Pause Game",
+  "sessionResult": "Session Result",
+  "gameOver": "Game Over",
+  "finalScore": "Final Score",
+  "gameAccuracy": "Accuracy",
+  "hits": "Hits",
+  "misses": "Misses",
+  "sessionDuration": "Duration",
+  "difficultyLevel": "Difficulty",
+  "backToHub": "Back to Hub",
+  "playAgain": "Play Again"
+
 }

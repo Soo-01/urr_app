@@ -12,6 +12,7 @@ import 'control.dart';
 import 'file_upload.dart';
 import 'information.dart';
 import 'generated/l10n.dart';
+import 'games/game_hub.dart';
 
 class BottomNavBar extends StatefulWidget {
   final BluetoothService bluetoothService;
@@ -125,7 +126,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
   }
 
   void _onItemTapped(int index) async {
-    if (index == 4) {
+    if (index == 6) {
       final success = await _showPasswordDialog();
       if (!success) {
         return;
@@ -287,6 +288,9 @@ class _BottomNavBarState extends State<BottomNavBar> {
           );
         },
       ),
+      GameHubScreen(                                   // 4
+        bluetoothService: _bluetoothService,
+      ),
       FileUploadScreen(
         bluetoothService: _bluetoothService,
         onFilesChanged: updateChangedFiles,
@@ -321,6 +325,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
                     NavigationRailDestination(icon: const Icon(Icons.straighten), label: Text(loc.romMode)),
                     NavigationRailDestination(icon: const Icon(Icons.fitness_center), label: Text(loc.modeSelect)),
                     NavigationRailDestination(icon: const Icon(Icons.settings), label: Text(loc.control)),
+                    NavigationRailDestination(icon: const Icon(Icons.sports_esports), label: Text(loc.game)),
                     NavigationRailDestination(icon: const Icon(Icons.file_upload), label: Text(loc.fileUpload)),
                     // NavigationRailDestination(icon: const Icon(Icons.info), label: Text(loc.information)),
                     NavigationRailDestination(icon: const Icon(Icons.history), label: Text(loc.history)),
@@ -369,6 +374,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
                   BottomNavigationBarItem(icon: const Icon(Icons.straighten), label: loc.romMode),
                   BottomNavigationBarItem(icon: const Icon(Icons.fitness_center), label: loc.modeSelect),
                   BottomNavigationBarItem(icon: const Icon(Icons.settings), label: loc.control),
+                  BottomNavigationBarItem(icon: const Icon(Icons.sports_esports), label: loc.game),
                   BottomNavigationBarItem(icon: const Icon(Icons.file_upload), label: loc.fileUpload),
                   // BottomNavigationBarItem(icon: const Icon(Icons.star), label: loc.information),
                   BottomNavigationBarItem(icon: const Icon(Icons.history), label: loc.history),

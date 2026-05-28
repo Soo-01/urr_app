@@ -847,6 +847,306 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter Password'**
   String get enterPwd;
+
+  /// No description provided for @game.
+  ///
+  /// In en, this message translates to:
+  /// **'Game'**
+  String get game;
+
+  /// No description provided for @skyGardener.
+  ///
+  /// In en, this message translates to:
+  /// **'Sky Gardener'**
+  String get skyGardener;
+
+  /// No description provided for @skyGardenerDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Sky Gardener Description'**
+  String get skyGardenerDesc;
+
+  /// No description provided for @cloudPainter.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud Painter'**
+  String get cloudPainter;
+
+  /// No description provided for @cloudPainterDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud Painter Description'**
+  String get cloudPainterDesc;
+
+  /// No description provided for @shieldGuard.
+  ///
+  /// In en, this message translates to:
+  /// **'Shield Guard'**
+  String get shieldGuard;
+
+  /// No description provided for @shieldGuardDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Shield Guard Description'**
+  String get shieldGuardDesc;
+
+  /// No description provided for @safeCracker.
+  ///
+  /// In en, this message translates to:
+  /// **'Safe Cracker'**
+  String get safeCracker;
+
+  /// No description provided for @safeCrackerDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Safe Cracker Description'**
+  String get safeCrackerDesc;
+
+  /// No description provided for @targetReaching.
+  ///
+  /// In en, this message translates to:
+  /// **'Target Reaching'**
+  String get targetReaching;
+
+  /// No description provided for @targetReachingDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Target Reaching Description'**
+  String get targetReachingDesc;
+
+  /// No description provided for @swimming.
+  ///
+  /// In en, this message translates to:
+  /// **'Swimming'**
+  String get swimming;
+
+  /// No description provided for @swimmingDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Swimming Description'**
+  String get swimmingDesc;
+
+  /// No description provided for @balloonPop.
+  ///
+  /// In en, this message translates to:
+  /// **'Balloon Pop'**
+  String get balloonPop;
+
+  /// No description provided for @balloonPopDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Balloon Pop Description'**
+  String get balloonPopDesc;
+
+  /// No description provided for @carpenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Carpenter'**
+  String get carpenter;
+
+  /// No description provided for @carpenterDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Carpenter Description'**
+  String get carpenterDesc;
+
+  /// No description provided for @potionMaker.
+  ///
+  /// In en, this message translates to:
+  /// **'Potion Maker'**
+  String get potionMaker;
+
+  /// No description provided for @potionMakerDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Potion Maker Description'**
+  String get potionMakerDesc;
+
+  /// No description provided for @mealHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal Helper'**
+  String get mealHelper;
+
+  /// No description provided for @mealHelperDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal Helper Description'**
+  String get mealHelperDesc;
+
+  /// No description provided for @trackingGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking Game'**
+  String get trackingGame;
+
+  /// No description provided for @trackingGameDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking Game Description'**
+  String get trackingGameDesc;
+
+  /// No description provided for @bowling.
+  ///
+  /// In en, this message translates to:
+  /// **'Bowling'**
+  String get bowling;
+
+  /// No description provided for @bowlingDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Bowling Description'**
+  String get bowlingDesc;
+
+  /// No description provided for @rehabGames.
+  ///
+  /// In en, this message translates to:
+  /// **'Rehab Games'**
+  String get rehabGames;
+
+  /// No description provided for @categoryShoulder.
+  ///
+  /// In en, this message translates to:
+  /// **'Shoulder'**
+  String get categoryShoulder;
+
+  /// No description provided for @categoryElbow.
+  ///
+  /// In en, this message translates to:
+  /// **'Elbow'**
+  String get categoryElbow;
+
+  /// No description provided for @categoryCombined.
+  ///
+  /// In en, this message translates to:
+  /// **'Combined'**
+  String get categoryCombined;
+
+  /// No description provided for @startGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Game'**
+  String get startGame;
+
+  /// No description provided for @brunnstromStage.
+  ///
+  /// In en, this message translates to:
+  /// **'Brunnstrom Stage'**
+  String get brunnstromStage;
+
+  /// No description provided for @cognitiveLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cognitive Level'**
+  String get cognitiveLevel;
+
+  /// No description provided for @neglectSide.
+  ///
+  /// In en, this message translates to:
+  /// **'Neglect Side'**
+  String get neglectSide;
+
+  /// No description provided for @neglectNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get neglectNone;
+
+  /// No description provided for @neglectLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get neglectLeft;
+
+  /// No description provided for @neglectRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get neglectRight;
+
+  /// No description provided for @selectDifficulty.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Difficulty'**
+  String get selectDifficulty;
+
+  /// No description provided for @gameDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Game Duration'**
+  String get gameDuration;
+
+  /// No description provided for @seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}s'**
+  String seconds(int count);
+
+  /// No description provided for @pauseGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause Game'**
+  String get pauseGame;
+
+  /// No description provided for @sessionResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Session Result'**
+  String get sessionResult;
+
+  /// No description provided for @gameOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Game Over'**
+  String get gameOver;
+
+  /// No description provided for @finalScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Final Score'**
+  String get finalScore;
+
+  /// No description provided for @gameAccuracy.
+  ///
+  /// In en, this message translates to:
+  /// **'Accuracy'**
+  String get gameAccuracy;
+
+  /// No description provided for @hits.
+  ///
+  /// In en, this message translates to:
+  /// **'Hits'**
+  String get hits;
+
+  /// No description provided for @misses.
+  ///
+  /// In en, this message translates to:
+  /// **'Misses'**
+  String get misses;
+
+  /// No description provided for @sessionDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get sessionDuration;
+
+  /// No description provided for @difficultyLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Difficulty'**
+  String get difficultyLevel;
+
+  /// No description provided for @backToHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Hub'**
+  String get backToHub;
+
+  /// No description provided for @playAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Again'**
+  String get playAgain;
 }
 
 class _AppLocalizationsDelegate
