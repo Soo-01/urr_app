@@ -159,14 +159,30 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // void _loadConnectionHistory() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   final keys = prefs.getKeys();
+  //   for (var key in keys) {
+  //     final count = prefs.getInt(key) ?? 0;
+  //     _connectionHistory[key] = count;
+  //   }
+  // }
   void _loadConnectionHistory() async {
     final prefs = await SharedPreferences.getInstance();
     final keys = prefs.getKeys();
+    
     for (var key in keys) {
-      final count = prefs.getInt(key) ?? 0;
-      _connectionHistory[key] = count;
+      // 1. 데이터를 타입에 상관없이 일단 가져옵니다.
+      final value = prefs.get(key);
+      
+      // 2. 만약 그 데이터가 숫자(int) 타입이라면 _connectionHistory에 넣습니다.
+      // (우리가 저장한 측정 기록 String 데이터는 여기서 자연스럽게 무시됩니다!)
+      if (value is int) {
+        _connectionHistory[key] = value;
+      }
     }
   }
+
 
   void _startScan() async {
     setState(() {

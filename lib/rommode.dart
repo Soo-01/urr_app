@@ -9,6 +9,7 @@ import 'dart:convert';  // 25.08.25 추가내용
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import 'main.dart';
+import 'record.dart';
 
 
 class ROMModeSelectScreen extends StatefulWidget {
@@ -415,15 +416,49 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
 
     if (_selectedMode == 'Stop') return;
 
-    if (_minAngle == null || _maxAngle == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${loc.noMeasuredAngle}')),
-      );
-      return;
-    }
+    ///////////////////////////////////////////////////////////// record.dart 테스트를 위해 아래 부분 잠시 주석함
+    // if (_minAngle == null || _maxAngle == null) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     SnackBar(content: Text('${loc.noMeasuredAngle}')),
+    //   );
+    //   return;
+    // }
+    ///////////////////////////////////////////////////////////// record.dart 테스트를 위해 윗 부분 잠시 주석함
+  
+    // ---------------------------------------------------------
+    // 2. [테스트용 더미 데이터 설정 및 저장 연동]
+    double dummyMinAngle = 10.5; // 가짜 최소 각도
+    double dummyMaxAngle = 135.0; // 가짜 최대 각도
+
+    
+    String currentVelocity = _selectedMode == 'Passive ROM' 
+        ? (_velocityController['Passive ROM'] ?? 'N/A') 
+        : 'N/A';
+    String details = 'Velocity: $currentVelocity'; // 필요시 Intensity 등 추가 가능
+
+    // record.dart의 RecordManager를 호출하여 누적 저장합니다.
+    await RecordManager.saveRecord(
+      UserRecord(
+        timestamp: DateTime.now(),
+        // userName: '테스트유저', // 임시 사용자 이름 (나중엔 프로필 연동 필요)
+        userName: userProvider.name ?? 'Unknown',
+        recordType: _selectedMode, // 'Passive ROM' 또는 'Active ROM'
+        joint: _selectedPart ?? '관절 미선택', // 드롭다운에서 선택한 관절
+        minAngle: dummyMinAngle, // 실제 구동 시엔 _minAngle! 로 복구
+        maxAngle: dummyMaxAngle, // 실제 구동 시엔 _maxAngle! 로 복구
+        // extraData: '테스트용 가짜 데이터입니다.',
+        extraData: details, // ★ Selected Mode Settings의 내용들이 여기에 같이 저장됨
+      )
+    );
+    // ---------------------------------------------------------
+
+
 
     final now = DateTime.now().toString().split(' ')[0];
-    final angleRange = '${_minAngle!.toStringAsFixed(1)}° ~ ${_maxAngle!.toStringAsFixed(1)}°';
+    // final angleRange = '${_minAngle!.toStringAsFixed(1)}° ~ ${_maxAngle!.toStringAsFixed(1)}°'; /// record.dart 테스트를 위해 윗 부분 잠시 주석함
+    final angleRange = '${dummyMinAngle.toStringAsFixed(1)}° ~ ${dummyMaxAngle.toStringAsFixed(1)}°';
+
+
 
     // ★ 1. Passive ROM과 Active ROM 구분하여 UserProvider에 데이터 저장
     if (_selectedMode == 'Passive ROM') {
@@ -435,14 +470,18 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
       userProvider.updateProm(
         _selectedPart!, 
         velocity, 
-        _minAngle!, 
-        _maxAngle!
+        // _minAngle!, 
+        // _maxAngle!
+        dummyMinAngle, // _minAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
+        dummyMaxAngle  // _maxAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
       );
     } else if (_selectedMode == 'Active ROM') {
       userProvider.updateArom(
         _selectedPart!, 
-        _minAngle!, 
-        _maxAngle!
+        // _minAngle!, 
+        // _maxAngle!
+        dummyMinAngle, // _minAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
+        dummyMaxAngle  // _maxAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
       );
     }
 

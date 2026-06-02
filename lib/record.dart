@@ -1,224 +1,173 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'main.dart'; // UserProvider가 정의된 파일 경로
-import 'generated/l10n.dart'; // 다국어 지원 (필요시 사용)
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
-class RecordScreen extends StatefulWidget {
-  const RecordScreen({super.key});
+// 1. 누적 저장을 위한 데이터 모델 정의
+class UserRecord {
+  final DateTime timestamp;
+  final String userName;     // 사용자 식별을 위한 이름
+  final String recordType;   // 예: 'Passive ROM', 'Active ROM', 'CPM', 'Isometric', 'Isotonic'
+  final String joint;        // 예: '오른팔 어깨 굴곡/신전', '왼팔 손목 굴곡/신전'
+  final double minAngle;
+  final double maxAngle;
+  final String extraData;    // 속도, 저항력 단계, 지속시간 등 추가 정보 (선택 사항)
 
-  @override
-  _RecordScreenState createState() => _RecordScreenState();
+  UserRecord({
+    required this.timestamp,
+    required this.userName,
+    required this.recordType,
+    required this.joint,
+    required this.minAngle,
+    required this.maxAngle,
+    this.extraData = '',
+  });
+
+  // 객체를 JSON으로 변환 (저장용)
+  Map<String, dynamic> toJson() => {
+        'timestamp': timestamp.toIso8601String(),
+        'userName': userName,
+        'recordType': recordType,
+        'joint': joint,
+        'minAngle': minAngle,
+        'maxAngle': maxAngle,
+        'extraData': extraData,
+      };
+
+  // JSON을 객체로 변환 (불러오기용)
+  factory UserRecord.fromJson(Map<String, dynamic> json) => UserRecord(
+        timestamp: DateTime.parse(json['timestamp']),
+        userName: json['userName'],
+        recordType: json['recordType'],
+        joint: json['joint'],
+        minAngle: json['minAngle'].toDouble(),
+        maxAngle: json['maxAngle'].toDouble(),
+        extraData: json['extraData'] ?? '',
+      );
 }
 
-class _RecordScreenState extends State<RecordScreen> {
-  // 사용자가 리스트에서 선택한 특정 기록을 담을 변수
-  Map<String, dynamic>? _selectedRecord;
+// 2. 다른 모드(ROM, CPM 등)에서 데이터를 저장하고 불러오기 위한 전역 매니저
+class RecordManager {
+  static const String _storageKey = 'user_accumulated_records';
+
+  // 새로운 기록을 기존 리스트에 누적하여 저장
+  static Future<void> saveRecord(UserRecord newRecord) async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? recordsJson = prefs.getString(_storageKey);
+    List<UserRecord> records = [];
+
+    if (recordsJson != null) {
+      final List<dynamic> decodedList = jsonDecode(recordsJson);
+      records = decodedList.map((item) => UserRecord.fromJson(item)).toList();
+    }
+
+    records.add(newRecord); // 새 기록 추가 (누적)
+    await prefs.setString(_storageKey, jsonEncode(records.map((r) => r.toJson()).toList()));
+  }
+
+  // 운동/게임을 위해 특정 사용자 & 특정 관절의 '가장 최근 ROM 측정값'만 가져오기
+  static Future<Map<String, double>?> getLatestROMLimit(String userName, String joint) async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? recordsJson = prefs.getString(_storageKey);
+    
+    if (recordsJson == null) return null;
+
+    final List<dynamic> decodedList = jsonDecode(recordsJson);
+    List<UserRecord> records = decodedList
+        .map((item) => UserRecord.fromJson(item))
+        .where((r) => r.userName == userName && 
+                      r.joint == joint && 
+                      r.recordType.contains('ROM')) // ROM 측정 기록만 필터링
+        .toList();
+
+    if (records.isEmpty) return null; // 해당 관절의 ROM 측정 기록이 없는 경우
+
+    // 최신 날짜 순으로 정렬 후 가장 첫 번째(최신) 데이터 반환
+    records.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return {
+      'minAngle': records.first.minAngle,
+      'maxAngle': records.first.maxAngle,
+    };
+  }
+}
+
+// 3. 기록을 사용자 UI에 보여주는 화면 위젯
+class RecordScreen extends StatelessWidget {
+  final String currentUser; // navi.dart 등에서 전달받을 현재 프로필 사용자 이름
+
+  const RecordScreen({super.key, required this.currentUser});
+
+  // SharedPreferences에서 데이터를 매번 새로 읽어오는 함수
+  Future<List<UserRecord>> _fetchRecords() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? recordsJson = prefs.getString(RecordManager._storageKey);
+    
+    if (recordsJson == null) return [];
+
+    final List<dynamic> decodedList = jsonDecode(recordsJson);
+    List<UserRecord> records = decodedList
+        .map((item) => UserRecord.fromJson(item))
+        // 💡 테스트 중이므로 현재 사용자 이름 필터링은 임시로 주석 처리합니다.
+        // .where((record) => record.userName == currentUser) 
+        .toList();
+    
+    // 최신 날짜순으로 정렬
+    records.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return records;
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Provider를 통해 누적된 유저 데이터를 실시간 감지
-    final userProvider = context.watch<UserProvider>();
-    final records = userProvider.userRecords; // 전체 누적 기록 리스트
-
-    // 누적 통계 계산 (ROM 측정 횟수 vs 실제 운동/훈련 횟수)
-    int totalRom = records.where((r) => r['mode'].toString().contains('ROM')).length;
-    int totalExercise = records.length - totalRom;
-
+    // FutureBuilder를 사용하면 탭을 누를 때마다 _fetchRecords()가 실행되어 최신 데이터를 가져옵니다.
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${userProvider.name.trim().isEmpty ? "사용자 없음" : userProvider.name}의 훈련 누적 기록'),
-        backgroundColor: Colors.blueAccent,
-        foregroundColor: Colors.white,
-      ),
-      body: userProvider.name.trim().isEmpty
-          ? const Center(
-              child: Text(
-                '먼저 사용자 정보를 입력하거나 불러와 주세요.',
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-            )
-          : Column(
-              children: [
-                // --- 1. 상단 누적 통계 요약 대시보드 ---
-                Container(
-                  color: Colors.grey.shade100,
-                  padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      appBar: AppBar(title: const Text('저장된 훈련 및 측정 기록')),
+      body: FutureBuilder<List<UserRecord>>(
+        future: _fetchRecords(), // 위에서 만든 함수 호출
+        builder: (context, snapshot) {
+          // 데이터를 불러오는 중일 때 (로딩 인디케이터)
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final _userRecords = snapshot.data ?? [];
+
+          // 저장된 기록이 없을 때
+          if (_userRecords.isEmpty) {
+            return const Center(child: Text('저장된 기록이 없습니다.', style: TextStyle(fontSize: 18)));
+          }
+
+          // 기록이 있을 때 리스트 뷰로 출력
+          return ListView.builder(
+            itemCount: _userRecords.length,
+            itemBuilder: (context, index) {
+              final record = _userRecords[index];
+              // 날짜 포맷팅 (예: 2026-06-02 15:30)
+              final formattedDate = record.timestamp.toString().substring(0, 16);
+
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                elevation: 2,
+                child: ListTile(
+                  leading: Icon(
+                    record.recordType.contains('ROM') ? Icons.straighten : Icons.fitness_center,
+                    color: record.recordType.contains('ROM') ? Colors.blue : Colors.orange,
+                    size: 36,
+                  ),
+                  title: Text('[${record.recordType}] ${record.joint}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildStatCard('총 누적 기록', '${records.length}건', Icons.history, Colors.blue),
-                      _buildStatCard('가동 범위 측정', '${totalRom}건', Icons.straighten, Colors.indigo),
-                      _buildStatCard('훈련(운동) 누적', '${totalExercise}건', Icons.fitness_center, Colors.green),
+                      const SizedBox(height: 4),
+                      Text('측정일: $formattedDate'),
+                      Text('가동 범위: ${record.minAngle}° ~ ${record.maxAngle}°'),
+                      if (record.extraData.isNotEmpty) Text('상세 설정: ${record.extraData}'),
                     ],
                   ),
+                  isThreeLine: true,
                 ),
-                const Divider(height: 1, thickness: 1),
-
-                // --- 2. 하단 기록 리스트 및 상세 뷰 (마스터-디테일 패턴) ---
-                Expanded(
-                  child: Row(
-                    children: [
-                      // [좌측 패널] 누적 기록 목록
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border(right: BorderSide(color: Colors.grey.shade300)),
-                          ),
-                          child: records.isEmpty
-                              ? const Center(child: Text('아직 저장된 훈련 기록이 없습니다.'))
-                              : ListView.builder(
-                                  itemCount: records.length,
-                                  // 최신 기록이 위로 오도록 역순 배치
-                                  itemBuilder: (context, index) {
-                                    final record = records[records.length - 1 - index];
-                                    final isSelected = _selectedRecord == record;
-                                    final isExercise = record['type'] == 'Exercise';
-
-                                    return ListTile(
-                                      tileColor: isSelected ? Colors.blue.shade50 : null,
-                                      leading: CircleAvatar(
-                                        backgroundColor: isExercise ? Colors.green.shade100 : Colors.indigo.shade100,
-                                        child: Icon(
-                                          isExercise ? Icons.fitness_center : Icons.straighten,
-                                          color: isExercise ? Colors.green : Colors.indigo,
-                                        ),
-                                      ),
-                                      title: Text(
-                                        '[${record['mode']}] ${record['part'] ?? '부위 미상'}',
-                                        style: TextStyle(
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        record['date']?.toString().split('.')[0] ?? '',
-                                      ),
-                                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedRecord = record;
-                                        });
-                                      },
-                                    );
-                                  },
-                                ),
-                        ),
-                      ),
-
-                      // [우측 패널] 선택된 특정 훈련의 상세 데이터
-                      Expanded(
-                        flex: 3,
-                        child: Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: _selectedRecord == null
-                              ? const Center(
-                                  child: Text(
-                                    '좌측에서 훈련 기록을 선택하면 상세 정보가 표시됩니다.',
-                                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                                  ),
-                                )
-                              : _buildRecordDetail(_selectedRecord!),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-
-  // 통계용 카드 위젯
-  Widget _buildStatCard(String title, String count, IconData icon, Color color) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(title, style: const TextStyle(fontSize: 16, color: Colors.grey)),
-            const SizedBox(height: 4),
-            Text(count, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 우측 상세 정보 렌더링 위젯
-  Widget _buildRecordDetail(Map<String, dynamic> record) {
-    final isExercise = record['type'] == 'Exercise';
-
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isExercise ? Icons.fitness_center : Icons.straighten,
-                color: isExercise ? Colors.green : Colors.indigo,
-                size: 32,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                '${record['mode']} 상세 기록',
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const Divider(height: 40, thickness: 2),
-          
-          _detailRow('훈련 일시', record['date']?.toString().split('.')[0] ?? ''),
-          _detailRow('타겟 관절', record['part'] ?? '-'),
-          
-          const SizedBox(height: 24),
-          const Text('측정 및 훈련 데이터', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-
-          // 모드별 데이터 조건부 렌더링
-          if (record['minAngle'] != null && record['maxAngle'] != null) ...[
-            _detailRow('최소 각도', '${record['minAngle']}°'),
-            _detailRow('최대 각도', '${record['maxAngle']}°'),
-          ],
-          
-          if (record['velocity'] != null && record['velocity'] != 'N/A')
-            _detailRow('훈련 속도', '${record['velocity']}'),
-            
-          if (record['mode'] == 'Isometric') ...[
-            _detailRow('목표 각도', '${record['targetAngle']}°'),
-            _detailRow('지속 시간', '${record['duration']}초'),
-            if (record['maxTorque'] != null)
-              _detailRow('최대 힘(Torque)', '${record['maxTorque']}'),
-          ],
-          
-          if (record['mode'] == 'Isotonic') ...[
-            _detailRow('저항력 단계', '${record['resistance']}'),
-            _detailRow('운동 도구', '${record['subMode'] ?? '미선택'}'), 
-          ],
-
-          if (record['reps'] != null && record['reps'] > 0)
-            _detailRow('반복 횟수', '${record['reps']}회'),
-        ],
-      ),
-    );
-  }
-
-  // 상세 정보 한 줄을 이쁘게 표시하기 위한 헬퍼 위젯
-  Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10.0),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 150, 
-            child: Text(label, style: const TextStyle(fontSize: 18, color: Colors.black54))
-          ),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-        ],
+              );
+            },
+          );
+        },
       ),
     );
   }

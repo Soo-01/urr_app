@@ -174,72 +174,6 @@ class _BottomNavBarState extends State<BottomNavBar> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
 
-    // final pages = [
-    //   HomeScreen(bluetoothService: _bluetoothService),
-    //   ProfileScreen(
-    //     name: _name,
-    //     gender: _gender,
-    //     age: _age,
-    //     height: _height,
-    //     weight: _weight,
-    //     arm: _arm,
-    //     onSave: (name, gender, age, height, weight, arm) {
-    //       setState(() {
-    //         _name = name;
-    //         _gender = gender;
-    //         _age = age;
-    //         _height = height;
-    //         _weight = weight;
-    //         _arm = arm;
-    //       });
-    //     },
-    //   ),
-    //   ROMModeSelectScreen(
-    //     bluetoothService: _bluetoothService,
-    //     onModeChanged: updateModeSettings,
-    //   ),
-    //   ModeSelectScreen(
-    //     bluetoothService: _bluetoothService,
-    //     onModeChanged: updateModeSettings,
-    //   ),
-    //   ControlScreen(
-    //     arm: _arm,
-    //     height: _height,
-    //     weight: _weight,
-    //     onSave: (controlMode, mode, values) {
-    //       setState(() {
-    //         _controlValues[controlMode] = values;
-    //       });
-    //       updateControlValues(
-    //         controlMode: controlMode,
-    //         selectedMode: mode,
-    //         selectedVelocity: _velocityController[mode] ?? '',
-    //         gains: values,
-    //         arm: _arm,
-    //         height: _height,
-    //         weight: _weight,
-    //       );
-    //     },
-    //   ),
-    //   FileUploadScreen(
-    //     bluetoothService: _bluetoothService,
-    //     onFilesChanged: updateChangedFiles,
-    //     onFilesSent: updateSendedFiles,
-    //   ),
-    //   Information(
-    //     sendedFiles: _sendedFiles,
-    //     selectedMode: _selectedMode,
-    //     selectedVelocity: _velocityController[_selectedMode] ?? '',
-    //     selectedIntensity: _intensityController[_selectedMode] ?? '',
-    //     name: _name,
-    //     gender: _gender,
-    //     age: _age,
-    //     height: _height,
-    //     weight: _weight,
-    //     arm: _arm,
-    //     controlValues: _controlValues,
-    //   ),
-    // ];
     final pages = [
       HomeScreen(bluetoothService: _bluetoothService),
       
@@ -299,43 +233,50 @@ class _BottomNavBarState extends State<BottomNavBar> {
     
       // 2. Information 수정: 개인정보(name, age 등) 파라미터를 모두 지웁니다.
       // (이 정보 역시 Information 내부에서 Provider로 가져옴)
-      Information(
-        sendedFiles: _sendedFiles,
-        selectedMode: _selectedMode,
-        selectedVelocity: _velocityController[_selectedMode] ?? '',
-        selectedIntensity: _intensityController[_selectedMode] ?? '',
-        controlValues: _controlValues,
-      ),
+      // Information(
+      //   sendedFiles: _sendedFiles,
+      //   selectedMode: _selectedMode,
+      //   selectedVelocity: _velocityController[_selectedMode] ?? '',
+      //   selectedIntensity: _intensityController[_selectedMode] ?? '',
+      //   controlValues: _controlValues,
+      // ),
+      const Information(),
     ];
 
     return Scaffold(
       body: OrientationBuilder(
         builder: (context, orientation) {
           final isLandscape = orientation == Orientation.landscape;
-          return Row(
+          return Stack(
             children: [
-              if (isLandscape)
-                NavigationRail(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: _onItemTapped,
-                  labelType: NavigationRailLabelType.selected,
-                  destinations: [
-                    NavigationRailDestination(icon: const Icon(Icons.home), label: Text(loc.home)),
-                    NavigationRailDestination(icon: const Icon(Icons.person), label: Text(loc.profile)),
-                    NavigationRailDestination(icon: const Icon(Icons.straighten), label: Text(loc.romMode)),
-                    NavigationRailDestination(icon: const Icon(Icons.fitness_center), label: Text(loc.modeSelect)),
-                    NavigationRailDestination(icon: const Icon(Icons.settings), label: Text(loc.control)),
-                    NavigationRailDestination(icon: const Icon(Icons.sports_esports), label: Text(loc.game)),
-                    NavigationRailDestination(icon: const Icon(Icons.file_upload), label: Text(loc.fileUpload)),
-                    // NavigationRailDestination(icon: const Icon(Icons.info), label: Text(loc.information)),
-                    NavigationRailDestination(icon: const Icon(Icons.history), label: Text(loc.history)),
-                  ],
-                ),
-              Expanded(child: IndexedStack(index: _selectedIndex, children: pages)),
-              // 우측 하단 글자 크기 조절 버튼 추가
+              // 1. 기존의 가로 배치 (네비게이션 바 + 메인 화면)
+              Row(
+                children: [
+                  if (isLandscape)
+                    NavigationRail(
+                      selectedIndex: _selectedIndex,
+                      onDestinationSelected: _onItemTapped,
+                      labelType: NavigationRailLabelType.selected,
+                      destinations: [
+                        NavigationRailDestination(icon: const Icon(Icons.home), label: Text(loc.home)),
+                        NavigationRailDestination(icon: const Icon(Icons.person), label: Text(loc.profile)),
+                        NavigationRailDestination(icon: const Icon(Icons.straighten), label: Text(loc.romMode)),
+                        NavigationRailDestination(icon: const Icon(Icons.fitness_center), label: Text(loc.modeSelect)),
+                        NavigationRailDestination(icon: const Icon(Icons.settings), label: Text(loc.control)),
+                        NavigationRailDestination(icon: const Icon(Icons.sports_esports), label: Text(loc.game)),
+                        NavigationRailDestination(icon: const Icon(Icons.file_upload), label: Text(loc.fileUpload)),
+                        NavigationRailDestination(icon: const Icon(Icons.history), label: Text(loc.history)),
+                      ],
+                    ),
+                  Expanded(child: IndexedStack(index: _selectedIndex, children: pages)),
+                ],
+              ),
+              
+              // 2. 글자 크기 조절 버튼 (Stack 안이므로 Positioned 사용 가능)
               Positioned(
                 right: 20,
-                bottom: orientation == Orientation.landscape ? 20 : 80, // 내비게이션 바 위치 고려
+                top: 80,
+                // bottom: orientation == Orientation.landscape ? 20 : 80, // 내비게이션 바 위치 고려
                 child: Column(
                   children: [
                     FloatingActionButton.small(
