@@ -202,6 +202,15 @@
   "sessionDuration": "Duration",
   "difficultyLevel": "Difficulty",
   "backToHub": "Back to Hub",
-  "playAgain": "Play Again"
+  "playAgain": "Play Again",
+
+
+  "userProfileAndHistory": "User Profile & History",
+  "savedMeasurementAndTrainigHistory": "Saved Measurement & Training History",
+  "noSavedHistory": "There is no saved history for this user.",
+  "date": "Date",
+  "data": "Data",
+  "range": "Range",
+  "details": "Details"
 
 }

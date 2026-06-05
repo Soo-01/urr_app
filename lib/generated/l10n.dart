@@ -1147,6 +1147,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Play Again'**
   String get playAgain;
+
+  /// No description provided for @userProfileAndHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'User Profile & History'**
+  String get userProfileAndHistory;
+
+  /// No description provided for @savedMeasurementAndTrainigHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved Measurement & Training History'**
+  String get savedMeasurementAndTrainigHistory;
+
+  /// No description provided for @noSavedHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no saved history for this user.'**
+  String get noSavedHistory;
+
+  /// No description provided for @date.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get date;
+
+  /// No description provided for @data.
+  ///
+  /// In en, this message translates to:
+  /// **'Data'**
+  String get data;
+
+  /// No description provided for @range.
+  ///
+  /// In en, this message translates to:
+  /// **'Range'**
+  String get range;
+
+  /// No description provided for @details.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get details;
 }
 
 class _AppLocalizationsDelegate

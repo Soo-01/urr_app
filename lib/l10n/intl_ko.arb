@@ -202,6 +202,15 @@
   "sessionDuration": "진행 시간",
   "difficultyLevel": "난이도",
   "backToHub": "허브로 돌아가기",
-  "playAgain": "다시 하기"
+  "playAgain": "다시 하기",
+
+
+  "userProfileAndHistory": "사용자 프로필 & 기록",
+  "savedMeasurementAndTrainigHistory": "저장된 측정 및 운동 기록",
+  "noSavedHistory": "해당 사용자의 저장된 기록이 없습니다.",
+  "date": "날짜",
+  "data": "데이터",
+  "range": "범위",
+  "details": "세부정보"
 
 }

@@ -541,4 +541,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playAgain => 'Play Again';
+
+  @override
+  String get userProfileAndHistory => 'User Profile & History';
+
+  @override
+  String get savedMeasurementAndTrainigHistory =>
+      'Saved Measurement & Training History';
+
+  @override
+  String get noSavedHistory => 'There is no saved history for this user.';
+
+  @override
+  String get date => 'Date';
+
+  @override
+  String get data => 'Data';
+
+  @override
+  String get range => 'Range';
+
+  @override
+  String get details => 'Details';
 }

@@ -540,4 +540,25 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get playAgain => '다시 하기';
+
+  @override
+  String get userProfileAndHistory => '사용자 프로필 & 기록';
+
+  @override
+  String get savedMeasurementAndTrainigHistory => '저장된 측정 및 운동 기록';
+
+  @override
+  String get noSavedHistory => '해당 사용자의 저장된 기록이 없습니다.';
+
+  @override
+  String get date => '날짜';
+
+  @override
+  String get data => '데이터';
+
+  @override
+  String get range => '범위';
+
+  @override
+  String get details => '세부정보';
 }

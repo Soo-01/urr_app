@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'generated/l10n.dart';
+
 
 // 1. 누적 저장을 위한 데이터 모델 정의
 class UserRecord {
@@ -117,9 +119,11 @@ class RecordScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+
     // FutureBuilder를 사용하면 탭을 누를 때마다 _fetchRecords()가 실행되어 최신 데이터를 가져옵니다.
     return Scaffold(
-      appBar: AppBar(title: const Text('저장된 훈련 및 측정 기록')),
+      appBar: AppBar(title: Text(loc.savedMeasurementAndTrainigHistory)),
       body: FutureBuilder<List<UserRecord>>(
         future: _fetchRecords(), // 위에서 만든 함수 호출
         builder: (context, snapshot) {
@@ -132,7 +136,7 @@ class RecordScreen extends StatelessWidget {
 
           // 저장된 기록이 없을 때
           if (_userRecords.isEmpty) {
-            return const Center(child: Text('저장된 기록이 없습니다.', style: TextStyle(fontSize: 18)));
+            return Center(child: Text(loc.noSavedHistory, style: TextStyle(fontSize: 18)));
           }
 
           // 기록이 있을 때 리스트 뷰로 출력
@@ -157,9 +161,9 @@ class RecordScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
-                      Text('측정일: $formattedDate'),
-                      Text('가동 범위: ${record.minAngle}° ~ ${record.maxAngle}°'),
-                      if (record.extraData.isNotEmpty) Text('상세 설정: ${record.extraData}'),
+                      Text('${loc.date}: $formattedDate'),
+                      Text('${loc.range}: ${record.minAngle}° ~ ${record.maxAngle}°'),
+                      if (record.extraData.isNotEmpty) Text('${loc.details}: ${record.extraData}'),
                     ],
                   ),
                   isThreeLine: true,
