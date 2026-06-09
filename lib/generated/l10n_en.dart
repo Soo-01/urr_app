@@ -348,6 +348,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lWrist => 'Left Wrist Ext/Flx';
 
   @override
+  String get rShoulderEF => 'Right Shoulder Ext/Flx';
+
+  @override
+  String get rShoulderRo => 'Right Shoulder Int/Ext Rotation';
+
+  @override
+  String get rElbow => 'Right Elbow Ext/Flx';
+
+  @override
+  String get rWrist => 'Right Wrist Ext/Flx';
+
+  @override
   String get userInfoEntry => 'User Information Entry';
 
   @override

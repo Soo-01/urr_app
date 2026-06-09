@@ -653,6 +653,10 @@ class _ModeSelectScreenState extends State<ModeSelectScreen> {
                                 value: 'lElbow', label: loc.lElbow),
                             DropdownMenuEntry(
                                 value: 'lWrist', label: loc.lWrist),
+                            DropdownMenuEntry(value: 'rShoulderEF', label: loc.rShoulderEF),
+                            DropdownMenuEntry(value: 'rShoulderRo', label: loc.rShoulderRo),
+                            DropdownMenuEntry(value: 'rElbow',      label: loc.rElbow),
+                            DropdownMenuEntry(value: 'rWrist',      label: loc.rWrist),
                           ],
                           onSelected: (value) async {
                             setState(() => _selectedPart = value);

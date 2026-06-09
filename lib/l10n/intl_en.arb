@@ -127,6 +127,10 @@
   "lShoulderRo": "Left Shoulder Int/Ext Rotation",
   "lElbow": "Left Elbow Ext/Flx",
   "lWrist": "Left Wrist Ext/Flx",
+  "rShoulderEF": "Right Shoulder Ext/Flx",
+  "rShoulderRo": "Right Shoulder Int/Ext Rotation",
+  "rElbow": "Right Elbow Ext/Flx",
+  "rWrist": "Right Wrist Ext/Flx",
 
   "userInfoEntry": "User Information Entry",
   "loadUser": "Load",

@@ -348,6 +348,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get lWrist => '왼쪽 손목 굴곡/신전';
 
   @override
+  String get rShoulderEF => '오른쪽 어깨 굴곡/신전';
+
+  @override
+  String get rShoulderRo => '오른쪽 어깨 내회전/외회전';
+
+  @override
+  String get rElbow => '오른쪽 팔꿈치 굴곡/신전';
+
+  @override
+  String get rWrist => '오른쪽 손목 굴곡/신전';
+
+  @override
   String get userInfoEntry => '사용자 정보 입력';
 
   @override

@@ -127,6 +127,10 @@
   "lShoulderRo": "왼쪽 어깨 내회전/외회전",
   "lElbow": "왼쪽 팔꿈치 굴곡/신전",
   "lWrist": "왼쪽 손목 굴곡/신전",
+  "rShoulderEF": "오른쪽 어깨 굴곡/신전",
+  "rShoulderRo": "오른쪽 어깨 내회전/외회전",
+  "rElbow": "오른쪽 팔꿈치 굴곡/신전",
+  "rWrist": "오른쪽 손목 굴곡/신전",
 
   "userInfoEntry": "사용자 정보 입력",
   "loadUser": "불러오기",

@@ -30,6 +30,74 @@ class Information extends StatelessWidget {
     return records;
   }
 
+
+  // 예시: 파일 상단 또는 클래스 내부에 작성
+String getLocalizedGender(String gender, AppLocalizations loc) {
+  switch (gender) {
+    case 'Male': return loc.male;
+    case 'Female': return loc.female;
+    default: return gender; // 매핑되지 않은 경우 원본 텍스트 반환
+  }
+}
+
+String getLocalizedArm(String arm, AppLocalizations loc) {
+  switch (arm) {
+    case 'Right': return loc.right;
+    case 'Left': return loc.left;
+    default: return arm;
+  }
+}
+
+String getLocalizedMode(String mode, AppLocalizations loc) {
+  switch (mode) {
+    case 'Passive ROM': return loc.passiverom;
+    case 'Active ROM': return loc.activerom;
+    case 'CPM': return loc.cpm;
+    case 'Isometric': return loc.isometric;
+    case 'Isotonic': return loc.isotonic;
+
+    // case 'lShoulderEF': return loc.lShoulderEF;
+    // case 'lShoulderRo': return loc.lShoulderRo;
+    // case 'lElbow': return loc.lElbow;
+    // case 'lWrist': return loc.lWrist;
+
+    // case 'rShoulderEF': return loc.rShoulderEF;
+    // case 'rShoulderRo': return loc.rShoulderRo;
+    // case 'rElbow': return loc.rElbow;
+    // case 'rWrist': return loc.rWrist;    
+
+    default: return mode;
+  }
+}
+
+String getLocalizedJoint(String joint, AppLocalizations loc) {
+  switch (joint) {
+    case 'lShoulderEF': return loc.lShoulderEF;
+    case 'lShoulderRo': return loc.lShoulderRo;
+    case 'lElbow': return loc.lElbow;
+    case 'lWrist': return loc.lWrist;
+
+    case 'rShoulderEF': return loc.rShoulderEF;
+    case 'rShoulderRo': return loc.rShoulderRo;
+    case 'rElbow': return loc.rElbow;
+    case 'rWrist': return loc.rWrist;  
+    default: return joint; // 일치하는 게 없으면 원본 반환
+  }
+}
+
+
+String getLocalizedExtraData(String extraData, AppLocalizations loc) {
+  // 저장된 문자열 내부의 영어 라벨들을 한글 라벨로 교체합니다.
+  return extraData
+      .replaceAll('Velocity:', '속도:')
+      .replaceAll('Intensity:', '저항력:')
+      .replaceAll('Target Angle:', '목표 각도:')
+      .replaceAll('Duration:', '지속 시간:')
+      .replaceAll('SubMode:', '모드:')
+      .replaceAll('Cable', '케이블')
+      .replaceAll('Dumbbell', '덤벨');
+}
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
@@ -55,11 +123,12 @@ class Information extends StatelessWidget {
             Text('👤 ${loc.profile}:', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text('${loc.name}: $name'),
-            Text('${loc.gender}: $gender'),
+            // Text('${loc.gender}: $gender'),
+            Text('${loc.gender}: ${getLocalizedGender(gender, loc)}'),
             Text('${loc.age}: $age'),
             Text('${loc.height}: $height cm'),
             Text('${loc.weight}: $weight kg'),
-            Text('${loc.diseasedArm}: $arm'),
+            Text('${loc.diseasedArm}: ${getLocalizedArm(arm, loc)}'),
             const Divider(thickness: 2, height: 32),
 
             // 💡 Sended Files, Selected Mode Settings, Control Gains 화면에서 모두 제거됨
@@ -92,6 +161,22 @@ class Information extends StatelessWidget {
                   children: records.map((record) {
                     final formattedDate = record.timestamp.toString().substring(0, 16);
 
+                    // return Card(
+                    //   margin: const EdgeInsets.symmetric(vertical: 6),
+                    //   elevation: 2,
+                    //   child: ListTile(
+                    //     leading: Icon(
+                    //       record.recordType.contains('ROM') ? Icons.straighten : Icons.fitness_center,
+                    //       color: record.recordType.contains('ROM') ? Colors.blue : Colors.orange,
+                    //       size: 32,
+                    //     ),
+                    //     title: Text('[${record.recordType}] ${record.joint}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    //     subtitle: Text('${loc.data}: $formattedDate\n${loc.range}: ${record.minAngle}° ~ ${record.maxAngle}°' +
+                    //         // ★ 여기에 기존 Selected Mode Settings 였던 속도 등의 정보가 나옵니다.
+                    //         (record.extraData.isNotEmpty ? '\n${loc.details}: ${record.extraData}' : '')),
+                    //     isThreeLine: true,
+                    //   ),
+                    // );
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 6),
                       elevation: 2,
@@ -101,10 +186,16 @@ class Information extends StatelessWidget {
                           color: record.recordType.contains('ROM') ? Colors.blue : Colors.orange,
                           size: 32,
                         ),
-                        title: Text('[${record.recordType}] ${record.joint}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${loc.data}: $formattedDate\n${loc.range}: ${record.minAngle}° ~ ${record.maxAngle}°' +
-                            // ★ 여기에 기존 Selected Mode Settings 였던 속도 등의 정보가 나옵니다.
-                            (record.extraData.isNotEmpty ? '\n${loc.details}: ${record.extraData}' : '')),
+                        // 1️⃣ title 부분 수정: Mode(기록 타입)와 Joint(관절 부위)를 한글로 변환
+                        title: Text(
+                          '[${getLocalizedMode(record.recordType, loc)}] ${getLocalizedJoint(record.joint, loc)}', 
+                          style: const TextStyle(fontWeight: FontWeight.bold)
+                        ),
+                        // 2️⃣ subtitle 부분 수정: extraData 내부의 영문 정보(Velocity, Intensity 등)를 한글로 변환
+                        subtitle: Text(
+                          '${loc.data}: $formattedDate\n${loc.range}: ${record.minAngle}° ~ ${record.maxAngle}°' +
+                          (record.extraData.isNotEmpty ? '\n${loc.details}: ${getLocalizedExtraData(record.extraData, loc)}' : '')
+                        ),
                         isThreeLine: true,
                       ),
                     );

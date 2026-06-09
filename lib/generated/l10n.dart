@@ -764,6 +764,30 @@ abstract class AppLocalizations {
   /// **'Left Wrist Ext/Flx'**
   String get lWrist;
 
+  /// No description provided for @rShoulderEF.
+  ///
+  /// In en, this message translates to:
+  /// **'Right Shoulder Ext/Flx'**
+  String get rShoulderEF;
+
+  /// No description provided for @rShoulderRo.
+  ///
+  /// In en, this message translates to:
+  /// **'Right Shoulder Int/Ext Rotation'**
+  String get rShoulderRo;
+
+  /// No description provided for @rElbow.
+  ///
+  /// In en, this message translates to:
+  /// **'Right Elbow Ext/Flx'**
+  String get rElbow;
+
+  /// No description provided for @rWrist.
+  ///
+  /// In en, this message translates to:
+  /// **'Right Wrist Ext/Flx'**
+  String get rWrist;
+
   /// No description provided for @userInfoEntry.
   ///
   /// In en, this message translates to:
