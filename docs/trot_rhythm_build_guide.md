@@ -340,30 +340,213 @@ position.y = gameRef.targetY - (timeDiff * (fallDistance / fallTime));
 
 ## 13. 작업 체크리스트
 
-### Phase 1 — Suno 음악 + 노트 맵
-- [ ] Suno로 트로트 BGM 생성 (Pro 플랜 권장)
-- [ ] BPM 추출 및 librosa/Sonic Visualiser로 비트 타임스탬프 추출
-- [ ] `assets/maps/trot_map_01.json` 노트 맵 생성
+### Phase 1 — 음악 제작 + 노트 맵
+
+#### 1-A. Suno BGM 생성
+- [ ] Suno(suno.ai) 접속 → 9-1 섹션 프롬프트 입력
+- [ ] 120 BPM 트로트 스타일 3가지 버전 생성 후 1곡 선택
+- [ ] MP3 다운로드 → `assets/audio/trot_rhythm/trot_bgm_01.mp3` 저장
+- [ ] `pubspec.yaml` flutter.assets에 `assets/audio/trot_rhythm/` 경로 추가
+
+#### 1-B. BPM 및 비트 추출
+- [ ] Tunebat.com에 MP3 업로드 → BPM 수치 기록
+- [ ] Python librosa 설치: `pip install librosa`
+- [ ] 아래 스크립트 실행하여 비트 타임스탬프 배열 추출:
+  ```python
+  import librosa, json
+  y, sr = librosa.load('trot_bgm_01.mp3')
+  tempo, beats = librosa.beat.beat_track(y=y, sr=sr)
+  times = librosa.frames_to_time(beats, sr=sr).tolist()
+  print(f"BPM: {tempo:.1f}, beats: {len(times)}")
+  ```
+- [ ] 추출된 첫 10개 타임스탬프를 BGM과 함께 수동 청취로 검증
+
+#### 1-C. 노트 맵 JSON 생성
+- [ ] 비트 타임스탬프를 lane 값(0/1/2)과 조합하여 JSON 배열 작성
+  - 초안: 모든 노트를 lane=1(center)로 우선 배치
+  - 이후: 박자 강약에 따라 레인 분산 (강박=center, 약박=left/right)
+- [ ] 게임 시간(60초) 범위 내로 맵 자르기
+- [ ] `assets/maps/trot_map_01.json` 저장:
+  ```json
+  [
+    {"time": 1.23, "lane": 1},
+    {"time": 1.85, "lane": 0},
+    {"time": 2.40, "lane": 2}
+  ]
+  ```
+- [ ] `pubspec.yaml` assets에 `assets/maps/` 경로 추가
+
+---
 
 ### Phase 2 — 리듬 코어 로직
-- [ ] FlameAudio BGM 재생 + `getCurrentPosition` 동기화 (`_songTime`)
-- [ ] JSON 노트 맵 파싱 및 `NoteComponent` 스폰
-- [ ] 오디오 시간 기반 절대 좌표 낙하 계산 (10-2 섹션)
 
-### Phase 3 — 관절 매핑 + 판정
-- [ ] 어깨 각도 → 3레인(0/1/2) 이산화 → 응원봉 X 이동
-- [ ] 팔꿈치 velocity 계산 + `swingThreshold` 감지
-- [ ] 眞/善/아쉬워 판정 분기 + 콤보 로직
+#### 2-A. 파일 뼈대 생성
+- [ ] `lib/games/games/trot_rhythm_game.dart` 파일 생성
+- [ ] `claude_code_game_dev_guide.md` 패턴대로 `FlameGame + StatefulWidget` 기본 구조 작성
+- [ ] `NoteData` 클래스 정의 (time: double, lane: int)
+- [ ] `NoteComponent` 클래스 생성 (`PositionComponent` 상속, hitTime/lane 필드)
 
-### Phase 4 — 에셋 + 연출
-- [ ] 가수 아바타, 응원봉, 하트 노트 스프라이트 제작 (8번 섹션 프롬프트)
-- [ ] 眞/善 한자 텍스트 이미지 제작 (포토샵, 붓글씨 폰트, 금박)
-- [ ] 판정선 하트 펄스, 스윙 SequenceEffect, 피버 오버레이 구현
+#### 2-B. 오디오 + 싱크
+- [ ] `onLoad()`에서 `FlameAudio.audioCache.loadAll([bgm, sfx 목록])` 호출
+- [ ] `_audioPlayer` 인스턴스 생성 및 BGM 재생 시작
+- [ ] `update(dt)` 내에서 `_songTime` 폴링 갱신 구현 (10-1 섹션 코드)
+- [ ] 일시정지/재개 시 `_audioPlayer.pause()` / `resume()` 연동
 
-### Phase 5 — QA
-- [ ] 판정 윈도우 튜닝 (어르신 반응 속도 기준)
-- [ ] BGM + SFX 볼륨 밸런싱
-- [ ] 파티클 증가 시 프레임 드랍 여부 확인
+#### 2-C. 노트 맵 파싱 + 스폰
+- [ ] `onLoad()`에서 `assets/maps/trot_map_01.json` 로드 및 `_mapData` 파싱
+- [ ] `update(dt)`에서 `_songTime >= note.time && !note.spawned` 조건으로 스폰
+- [ ] `NoteComponent`를 게임 트리에 `add()`
+- [ ] 판정선 아래로 내려간 노트(Miss 처리 후) `removeFromParent()` 호출
+
+#### 2-D. 노트 낙하 계산
+- [ ] `targetY` 상수: 화면 하단에서 150px 위 (판정선 Y좌표)
+- [ ] `fallTime` 상수: Level별 2.0~3.0초 (4번 섹션 테이블 참조)
+- [ ] `NoteComponent.update(dt)` 내 절대 좌표 계산 구현 (10-2 섹션 코드)
+- [ ] `_songTime` 이전에 hitTime이 지난 노트 → Miss 처리 후 제거
+
+---
+
+### Phase 3 — 관절 매핑 + 판정 시스템
+
+#### 3-A. 어깨 → 레인 이산화
+- [ ] BT 입력 파트 코드 확인: `PART:lShoulderEF` (어깨 굽힘/폄)
+- [ ] `AngleNormalizer`로 원시 각도 → 0.0~1.0 정규화
+- [ ] 정규화 값 → 레인 변환:
+  ```dart
+  int _angleToLane(double normalized) {
+    if (normalized < 0.33) return 0; // Left
+    if (normalized < 0.66) return 1; // Center
+    return 2;                         // Right
+  }
+  ```
+- [ ] 레인 변경 시 응원봉 X좌표를 `MoveEffect.to()`로 부드럽게 이동 (0.1초)
+- [ ] 레인 X좌표 상수 설정: `laneX = [size.x*0.25, size.x*0.5, size.x*0.75]`
+
+#### 3-B. 팔꿈치 → 스윙 감지
+- [ ] `_prevElbowAngle` 변수 선언
+- [ ] 매 프레임 velocity 계산: `_elbowVelocity = (current - _prev) / dt`
+- [ ] `_prevElbowAngle = currentAngle` 업데이트
+- [ ] `_elbowVelocity > swingThreshold && !_isHitting` 조건으로 타격 발동
+- [ ] `_isHitting = true`, `_hitCooldownTimer = 0.3` 설정
+- [ ] `update(dt)`에서 `_hitCooldownTimer -= dt; if <= 0 → _isHitting = false`
+
+#### 3-C. 판정 분기
+- [ ] 현재 레인의 `_activeNotes`에서 가장 hitTime이 가까운 노트 탐색
+- [ ] `timeDiff = (_songTime - note.hitTime).abs()` 계산
+- [ ] 분기 처리:
+  ```dart
+  if (timeDiff < perfectWindow) → _onPerfect(note)
+  else if (timeDiff < goodWindow) → _onGood(note)
+  else → _onMiss()
+  ```
+- [ ] `_onPerfect()`: score += 100 * comboMultiplier, combo++, feverGauge += 5
+- [ ] `_onGood()`: score += 50, combo++, feverGauge += 2
+- [ ] `_onMiss()`: combo = 0, feverGauge -= 10 (min 0), lifeCount--
+- [ ] `_maxCombo` 갱신: `if (combo > _maxCombo) _maxCombo = combo`
+- [ ] `lifeCount <= 0` → `_gameOver()` 호출
+
+---
+
+### Phase 4 — 에셋 제작 + 연출 구현
+
+#### 4-A. AI 이미지 생성 (8번 섹션 프롬프트 사용)
+- [ ] `bg_trot_stage.png` — 경연 무대 배경 (1920×1080, 유지)
+- [ ] `singer_avatar.png` — 흰 슈트 한국인 가수 (512×512, 초록 배경)
+- [ ] `cursor_stick.png` — 하늘색 LED 응원봉 (256×512, 초록 배경)
+- [ ] `note_heart.png` — 홍색+금색 하트 (256×256, 초록 배경)
+- [ ] `hit_effect.png` — 하트+금색 파티클 폭발 (512×512, **검정** 배경)
+- [ ] `target_zone.png` — 골드 판정 링 (256×256, **검정** 배경)
+- [ ] `lane_line.png` — 홍색 수직 선 (128×1024, **검정** 배경)
+
+#### 4-B. 한자 텍스트 이미지 직접 제작
+- [ ] 눈누(noonnu.cc)에서 붓글씨 계열 TTF 다운로드 (상업용 무료 필터)
+- [ ] 포토샵/Canva에서 `ui_text_jin.png` 제작: "眞" 금박 그라디언트 + 검정 외곽선 (512×256, 초록 배경)
+- [ ] `ui_text_seon.png` 제작: "善" 흰색 + 홍색 외곽선 (512×256, 초록 배경)
+- [ ] `ui_text_miss.png` 제작: "아쉬워" 회색 + 가는 외곽선 (512×256, 초록 배경)
+
+#### 4-C. 누끼 + 최적화
+- [ ] 초록 배경 7종: remove.bg 또는 포토샵으로 배경 제거 → PNG-24 저장
+- [ ] 검정 배경 3종: Levels 도구로 RGB(0,0,0) 순수 검정 확인
+- [ ] 전체 10종: tinypng.com 압축
+- [ ] `assets/images/trot_rhythm/` 폴더에 소문자 언더스코어 네이밍으로 저장
+- [ ] `pubspec.yaml` assets에 `assets/images/trot_rhythm/` 경로 추가
+
+#### 4-D. Flutter 코드 — 스프라이트 연동
+- [ ] `onLoad()`에서 `Flame.images.loadAll([...])` 모든 이미지 캐싱
+- [ ] `singer_avatar` SpriteComponent 생성 → `MoveEffect` 바운스 댄스 적용
+- [ ] `cursor_stick` SpriteComponent 생성 → 레인 X좌표 계산 및 이동 연결
+- [ ] `note_heart` NoteComponent에 Sprite 렌더링 추가
+- [ ] `target_zone` 3개 생성 (레인별) → `BlendMode.plus` 설정 → 하트 펄스 `ScaleEffect`
+- [ ] `lane_line` 4개 생성 (레인 경계) → `BlendMode.plus` 설정 → 반투명 고정
+- [ ] `hit_effect` 타격 시 생성 → `ScaleEffect.to(1.5)` + `OpacityEffect.to(0)` → `RemoveEffect()`
+- [ ] 판정 팝업: 판정 시 해당 `ui_text_*` SpriteComponent 생성 → `ScaleEffect` + `MoveEffect` + `RemoveEffect()`
+
+#### 4-E. 피버 시스템 구현
+- [ ] `_feverGauge` 100.0 도달 시 `_isFeverTime = true`, `_feverTimer = 10.0`
+- [ ] 피버 중 홍색 오버레이 `RectangleComponent` 최상단 아래에 추가 (`BlendMode.colorDodge`)
+- [ ] 응원봉 색상 순환: `_feverColorTimer` 매 프레임 증가 → `sin()` 값으로 하늘색↔흰색 보간
+- [ ] 하트 파티클 `ParticleSystemComponent` 추가 (배경에서 위로 솟구침, 초당 5개)
+- [ ] `update(dt)`에서 `_feverTimer -= dt; if <= 0 → _isFeverTime = false` 및 오버레이 제거
+
+#### 4-F. HUD 구현
+- [ ] 점수 `TextComponent` 우상단 (size 28, 흰색, 골드 외곽선)
+- [ ] 콤보 `TextComponent` 화면 중앙 상단 (size 40, 콤보 0일 때 숨김)
+- [ ] 피버 게이지: 배경 `RectangleComponent` + 채우기 `RectangleComponent` (좌하단 가로 바)
+- [ ] 체력 하트 5개 `SpriteComponent` 좌상단 배치 → Miss 시 하나씩 회색 처리
+
+---
+
+### Phase 5 — 효과음 추가
+
+- [ ] freesound.org에서 CC0 태그 필터 후 맑은 종소리(perfect), 차임(good), 둔탁한 소리(miss), 팡파레(fever) 각 1개 다운로드
+- [ ] `.ogg` 포맷으로 변환 (ffmpeg 또는 온라인 컨버터)
+- [ ] `assets/audio/trot_rhythm/` 폴더에 저장 (11번 섹션 파일명 참조)
+- [ ] `pubspec.yaml` assets 등록
+- [ ] `onLoad()`에서 `FlameAudio.audioCache.loadAll([sfx 목록])` 호출
+- [ ] `_onPerfect()`, `_onGood()`, `_onMiss()`, 피버 진입 시 각각 SFX 재생
+
+---
+
+### Phase 6 — GameResult 연동 + 종료 처리
+
+- [ ] `_gameOver()` 또는 곡 종료 시 `GameResult` 객체 생성:
+  ```dart
+  GameResult(
+    gameId: 'E4',
+    score: _score,
+    maxPossibleScore: _mapData.length * 100,
+    accuracy: _combo / _mapData.length,
+    duration: Duration(seconds: 60),
+    hits: _totalHits,
+    misses: _totalMisses,
+  )
+  ```
+- [ ] `widget.onGameEnd(result)` 콜백 호출
+- [ ] BT 연결 끊김 이벤트 수신 시 `_audioPlayer.pause()` + 게임 일시정지 처리
+
+---
+
+### Phase 7 — QA 및 튜닝
+
+#### 7-A. 판정 튜닝
+- [ ] Level 1에서 노트 낙하 속도가 3초 도달인지 실측 확인
+- [ ] 어르신 반응 속도(~0.5초) 기준으로 `perfectWindow` / `goodWindow` 재조정 필요 여부 확인
+- [ ] 스윙 `swingThreshold` 값: 너무 낮으면 오판정, 너무 높으면 Miss 과다 → 수치 튜닝
+
+#### 7-B. 오디오 밸런싱
+- [ ] BGM 0.7 볼륨에서 SFX가 묻히지 않는지 확인
+- [ ] 모바일 기기 스피커에서 음원 깨짐 여부 확인
+- [ ] SFX가 타격 즉시(지연 없이) 재생되는지 확인 (캐싱 확인)
+
+#### 7-C. 성능 확인
+- [ ] 피버 타임 파티클 30개 이상 시 FPS 드랍 여부 확인 → 최대 개수 제한 설정
+- [ ] 노트 20개 동시 화면에 있을 때 렌더링 부하 확인
+- [ ] 앱 가로 모드 고정 (`AndroidManifest.xml` screenOrientation) 확인
+
+#### 7-D. 최종 흐름 검증
+- [ ] 게임 시작 → BGM 재생 → 노트 낙하 → 판정 → 종료 → GameResultScreen 전환 전체 흐름 확인
+- [ ] `GameResult` 반환값 (score, maxCombo, accuracy, angleHistory) 정상 채워지는지 확인
+- [ ] Brunnstrom Stage 2(가장 낮은 단계) 설정 시 모터 CPM 보조가 정상 작동하는지 확인
 
 ---
 
