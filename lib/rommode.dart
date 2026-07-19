@@ -6,7 +6,7 @@ import 'dart:async'; // 25.06.02 추가내용
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import 'main.dart';
-// import 'record.dart'; // 더미 ROM 기록 기능 비활성화 중
+import 'record.dart';
 import 'robot_command_service.dart';
 import 'robot_protocol.dart';
 
@@ -33,13 +33,29 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
   };
 
   // 25.06.02 추가내용
-  double? _currentAngle;
-  double? _minAngle;
-  double? _maxAngle;
+  final Map<String, double?> _currentAngles = {
+    'Passive ROM': null,
+    'Active ROM': null,
+  };
+  final Map<String, double?> _minAngles = {
+    'Passive ROM': null,
+    'Active ROM': null,
+  };
+  final Map<String, double?> _maxAngles = {
+    'Passive ROM': null,
+    'Active ROM': null,
+  };
+  double? get _currentAngle => _currentAngles[_selectedMode];
+  set _currentAngle(double? value) => _currentAngles[_selectedMode] = value;
+  double? get _minAngle => _minAngles[_selectedMode];
+  set _minAngle(double? value) => _minAngles[_selectedMode] = value;
+  double? get _maxAngle => _maxAngles[_selectedMode];
+  set _maxAngle(double? value) => _maxAngles[_selectedMode] = value;
   StreamSubscription<RobotTelemetryFrame>? _btSubscription;
   bool _isMeasuring = false;
   bool _activeRom = false;
   bool _passiveRom = false;
+  String? _measurementMode;
   String? _selectedPart;
   late final RobotCommandService _robotCommands;
 
@@ -136,6 +152,7 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
       setState(() {
         _selectedMode = 'Stop';
         _isMeasuring = false;
+        _measurementMode = null;
         _currentAngle = null;
         _minAngle = null;
         _maxAngle = null;
@@ -199,6 +216,7 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
 
   Future<bool> _saveData(String action) async {
     final selectedVelocity = _velocityController[_selectedMode];
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
 
     // if (_selectedMode == 'Stop') return;
 
@@ -248,6 +266,14 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
       case 'Passive ROM':
         if (action == 'receive') {
           if (!_passiveRom) {
+            if (selectedVelocity?.isEmpty ?? true) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(AppLocalizations.of(context)!.selectVelocity),
+                ),
+              );
+              return false;
+            }
             final speed = (selectedVelocity?.isNotEmpty ?? false)
                 ? RobotProtocol.speedLevelToRadPerSec(selectedVelocity!)
                 : null;
@@ -286,10 +312,59 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
           ? await _robotCommands.sendForPart(part, cmd)
           : await _robotCommands.send(cmd);
       if (!success) return false;
+      if (!mounted) return false;
+      if (action == 'save') {
+        if (userProvider.name.trim().isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Please select or save a user first.')),
+          );
+          return false;
+        }
+        if (_selectedMode == 'Active ROM') {
+          if (_minAngle == null || _maxAngle == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text(AppLocalizations.of(context)!.noMeasuredAngle)),
+            );
+            return false;
+          }
+          await RecordManager.saveRecord(UserRecord(
+            timestamp: DateTime.now(),
+            userName: userProvider.name,
+            recordType: _selectedMode,
+            joint: _selectedPart!,
+            minAngle: _minAngle,
+            maxAngle: _maxAngle,
+          ));
+          userProvider.updateArom(_selectedPart!, _minAngle!, _maxAngle!);
+        } else if (_selectedMode == 'Passive ROM') {
+          if (_minAngle == null || _maxAngle == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text(AppLocalizations.of(context)!.noMeasuredAngle)),
+            );
+            return false;
+          }
+          await RecordManager.saveRecord(UserRecord(
+            timestamp: DateTime.now(),
+            userName: userProvider.name,
+            recordType: _selectedMode,
+            joint: _selectedPart!,
+            minAngle: _minAngle,
+            maxAngle: _maxAngle,
+            velocity: selectedVelocity ?? '',
+          ));
+          userProvider.updateProm(
+              _selectedPart!, selectedVelocity ?? '', _minAngle!, _maxAngle!);
+        }
+      }
       if (action == 'receive') {
+        _measurementMode = _selectedMode;
         _activeRom = _selectedMode == 'Active ROM';
         _passiveRom = _selectedMode == 'Passive ROM';
       } else if (action == 'save' || action == 'stop') {
+        _measurementMode = null;
         _activeRom = false;
         _passiveRom = false;
       }
@@ -303,13 +378,17 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
     _btSubscription = widget.bluetoothService.telemetryStream.listen((frame) {
       final joint = frame.jointForPart(_selectedPart);
       if (!_isMeasuring || joint == null || !joint.online || !mounted) return;
+      final measurementMode = _measurementMode;
+      if (measurementMode == null) return;
       final angle = joint.positionDegrees;
-      final newMin = _minAngle == null ? angle : math.min(_minAngle!, angle);
-      final newMax = _maxAngle == null ? angle : math.max(_maxAngle!, angle);
+      final previousMin = _minAngles[measurementMode];
+      final previousMax = _maxAngles[measurementMode];
+      final newMin = previousMin == null ? angle : math.min(previousMin, angle);
+      final newMax = previousMax == null ? angle : math.max(previousMax, angle);
       setState(() {
-        _currentAngle = angle;
-        _minAngle = newMin;
-        _maxAngle = newMax;
+        _currentAngles[measurementMode] = angle;
+        _minAngles[measurementMode] = newMin;
+        _maxAngles[measurementMode] = newMax;
       });
     });
   }

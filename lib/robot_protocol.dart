@@ -36,6 +36,7 @@ class RobotProtocol {
   static const String arom = 'arom';
   static const String reverseProm = 'dir';
   static const String stop = 'stop';
+  static const String isometricStop = 'isom_stop';
 
   static String prom({double? speedRadPerSec}) {
     if (speedRadPerSec == null) return 'prom';
@@ -109,6 +110,7 @@ class JointTelemetry {
     required this.velocityRadPerSec,
     required this.commandedTorqueNm,
     required this.measuredTorqueNm,
+    this.isometric,
   });
 
   final int id;
@@ -117,6 +119,7 @@ class JointTelemetry {
   final double velocityRadPerSec;
   final double commandedTorqueNm;
   final double measuredTorqueNm;
+  final IsometricTelemetry? isometric;
 
   double get positionDegrees => positionRad * 180.0 / math.pi;
   double get velocityDegreesPerSec => velocityRadPerSec * 180.0 / math.pi;
@@ -142,6 +145,53 @@ class JointTelemetry {
       velocityRadPerSec: velocity,
       commandedTorqueNm: commandedTorque,
       measuredTorqueNm: measuredTorque,
+      isometric: IsometricTelemetry.fromJson(value['isometric']),
+    );
+  }
+}
+
+enum IsometricPhase { idle, moving, holding, resting, completed }
+
+class IsometricTelemetry {
+  const IsometricTelemetry({
+    required this.phase,
+    required this.rep,
+    required this.totalReps,
+    required this.remainingMs,
+  });
+
+  final IsometricPhase phase;
+  final int rep;
+  final int totalReps;
+  final int remainingMs;
+
+  static IsometricTelemetry? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final phase = switch (value['phase']) {
+      'idle' => IsometricPhase.idle,
+      'moving' => IsometricPhase.moving,
+      'holding' => IsometricPhase.holding,
+      'resting' => IsometricPhase.resting,
+      'completed' => IsometricPhase.completed,
+      _ => null,
+    };
+    final rep = _asInt(value['rep']);
+    final totalReps = _asInt(value['total_reps']);
+    final remainingMs = _asInt(value['remaining_ms']);
+    if (phase == null ||
+        rep == null ||
+        totalReps == null ||
+        remainingMs == null ||
+        rep < 0 ||
+        totalReps < 0 ||
+        remainingMs < 0) {
+      return null;
+    }
+    return IsometricTelemetry(
+      phase: phase,
+      rep: rep,
+      totalReps: totalReps,
+      remainingMs: remainingMs,
     );
   }
 }

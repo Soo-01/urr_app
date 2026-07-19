@@ -131,6 +131,7 @@ class _InformationState extends State<Information> {
   }
 
   String getLocalizedExtraData(String extraData, AppLocalizations loc) {
+    if (loc.localeName != 'ko') return extraData;
     // 저장된 문자열 내부의 영어 라벨들을 한글 라벨로 교체합니다.
     return extraData
         .replaceAll('Velocity:', '속도:')
@@ -140,6 +141,45 @@ class _InformationState extends State<Information> {
         .replaceAll('SubMode:', '모드:')
         .replaceAll('Cable', '케이블')
         .replaceAll('Dumbbell', '덤벨');
+  }
+
+  List<String> _recordDetailLines(UserRecord record, AppLocalizations loc) {
+    final isKorean = loc.localeName == 'ko';
+    final lines = <String>[];
+    if (record.minAngle != null && record.maxAngle != null) {
+      lines.add(
+        '${loc.range}: ${record.minAngle!.toStringAsFixed(1)}° ~ ${record.maxAngle!.toStringAsFixed(1)}°',
+      );
+    }
+    if (record.velocity.isNotEmpty) {
+      lines.add('${isKorean ? '속도 단계' : 'Speed level'}: ${record.velocity}');
+    }
+    if (record.targetAngle != null) {
+      lines.add(
+          '${loc.targetAngle}: ${record.targetAngle!.toStringAsFixed(1)}°');
+    }
+    if (record.holdDurationSeconds != null) {
+      lines.add(
+        '${isKorean ? '유지 시간' : 'Hold duration'}: ${record.holdDurationSeconds!.toStringAsFixed(1)} s',
+      );
+    }
+    if (record.minTorque != null || record.maxTorque != null) {
+      lines.add(
+        '${isKorean ? '힘 수준 범위' : 'Force level range'}: '
+        '${record.minTorque?.toStringAsFixed(1) ?? '-'} ~ '
+        '${record.maxTorque?.toStringAsFixed(1) ?? '-'}',
+      );
+    }
+    if (record.resistanceLevel != null) {
+      lines.add(
+        '${isKorean ? '저항력 단계' : 'Resistance level'}: ${record.resistanceLevel!.toStringAsFixed(0)}',
+      );
+    }
+    if (record.extraData.isNotEmpty) {
+      lines.add(
+          '${loc.details}: ${getLocalizedExtraData(record.extraData, loc)}');
+    }
+    return lines;
   }
 
   @override
@@ -211,6 +251,7 @@ class _InformationState extends State<Information> {
                   children: records.map((record) {
                     final formattedDate =
                         record.timestamp.toString().substring(0, 16);
+                    final detailLines = _recordDetailLines(record, loc);
 
                     // return Card(
                     //   margin: const EdgeInsets.symmetric(vertical: 6),
@@ -250,13 +291,10 @@ class _InformationState extends State<Information> {
                               style:
                                   const TextStyle(fontWeight: FontWeight.bold),
                             ),
-                            subtitle: Text(
-                              '${loc.data}: $formattedDate\n${loc.range}: ${record.minAngle}° ~ ${record.maxAngle}°' +
-                                  (record.extraData.isNotEmpty
-                                      ? '\n${loc.details}: ${getLocalizedExtraData(record.extraData, loc)}'
-                                      : ''),
-                            ),
-                            isThreeLine: true,
+                            subtitle: Text([
+                              '${loc.date}: $formattedDate',
+                              ...detailLines,
+                            ].join('\n')),
                           ),
                           Positioned(
                             top: 2,

@@ -10,8 +10,14 @@ class UserRecord {
   final String
       recordType; // 예: 'Passive ROM', 'Active ROM', 'CPM', 'Isometric', 'Isotonic'
   final String joint; // 예: '오른팔 어깨 굴곡/신전', '왼팔 손목 굴곡/신전'
-  final double minAngle;
-  final double maxAngle;
+  final double? minAngle;
+  final double? maxAngle;
+  final String velocity;
+  final double? targetAngle;
+  final double? holdDurationSeconds;
+  final double? minTorque;
+  final double? maxTorque;
+  final double? resistanceLevel;
   final String extraData; // 속도, 저항력 단계, 지속시간 등 추가 정보 (선택 사항)
 
   UserRecord({
@@ -19,8 +25,14 @@ class UserRecord {
     required this.userName,
     required this.recordType,
     required this.joint,
-    required this.minAngle,
-    required this.maxAngle,
+    this.minAngle,
+    this.maxAngle,
+    this.velocity = '',
+    this.targetAngle,
+    this.holdDurationSeconds,
+    this.minTorque,
+    this.maxTorque,
+    this.resistanceLevel,
     this.extraData = '',
   });
 
@@ -32,6 +44,12 @@ class UserRecord {
         'joint': joint,
         'minAngle': minAngle,
         'maxAngle': maxAngle,
+        'velocity': velocity,
+        'targetAngle': targetAngle,
+        'holdDurationSeconds': holdDurationSeconds,
+        'minTorque': minTorque,
+        'maxTorque': maxTorque,
+        'resistanceLevel': resistanceLevel,
         'extraData': extraData,
       };
 
@@ -41,8 +59,14 @@ class UserRecord {
         userName: json['userName'],
         recordType: json['recordType'],
         joint: json['joint'],
-        minAngle: json['minAngle'].toDouble(),
-        maxAngle: json['maxAngle'].toDouble(),
+        minAngle: (json['minAngle'] as num?)?.toDouble(),
+        maxAngle: (json['maxAngle'] as num?)?.toDouble(),
+        velocity: json['velocity']?.toString() ?? '',
+        targetAngle: (json['targetAngle'] as num?)?.toDouble(),
+        holdDurationSeconds: (json['holdDurationSeconds'] as num?)?.toDouble(),
+        minTorque: (json['minTorque'] as num?)?.toDouble(),
+        maxTorque: (json['maxTorque'] as num?)?.toDouble(),
+        resistanceLevel: (json['resistanceLevel'] as num?)?.toDouble(),
         extraData: json['extraData'] ?? '',
       );
 }
@@ -99,6 +123,12 @@ class RecordManager {
         record.joint == target.joint &&
         record.minAngle == target.minAngle &&
         record.maxAngle == target.maxAngle &&
+        record.velocity == target.velocity &&
+        record.targetAngle == target.targetAngle &&
+        record.holdDurationSeconds == target.holdDurationSeconds &&
+        record.minTorque == target.minTorque &&
+        record.maxTorque == target.maxTorque &&
+        record.resistanceLevel == target.resistanceLevel &&
         record.extraData == target.extraData);
     if (index == -1) return false;
 
@@ -128,7 +158,9 @@ class RecordManager {
         .where((r) =>
             r.userName == userName &&
             r.joint == joint &&
-            r.recordType.contains('ROM')) // ROM 측정 기록만 필터링
+            r.recordType.contains('ROM') &&
+            r.minAngle != null &&
+            r.maxAngle != null) // ROM records with a valid angle range
         .toList();
 
     if (records.isEmpty) return null; // 해당 관절의 ROM 측정 기록이 없는 경우
@@ -136,8 +168,8 @@ class RecordManager {
     // 최신 날짜 순으로 정렬 후 가장 첫 번째(최신) 데이터 반환
     records.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return {
-      'minAngle': records.first.minAngle,
-      'maxAngle': records.first.maxAngle,
+      'minAngle': records.first.minAngle!,
+      'maxAngle': records.first.maxAngle!,
     };
   }
 }

@@ -15,6 +15,7 @@ void main() {
         RobotProtocol.isometric(targetDegrees: 60, holdSeconds: 5),
         'isometric,60,5',
       );
+      expect(RobotProtocol.isometricStop, 'isom_stop');
       expect(
         RobotProtocol.isotonic(targetDegrees: 90, resistanceKg: 1),
         'isotonic,90,1',
@@ -46,5 +47,32 @@ void main() {
     expect(joint?.positionDegrees, closeTo(90, 1e-9));
     expect(joint?.velocityDegreesPerSec, closeTo(0.5 * 180 / math.pi, 1e-9));
     expect(joint?.measuredTorqueNm, 1.1);
+  });
+
+  test('parses M7 isometric phase, repetition, and countdown', () {
+    const line = '{"arm":"RIGHT","state":[{"id":2,"online":1,"pos":0.1,'
+        '"vel":0.0,"tau_cmd":2.2,"tau_meas":2.0,'
+        '"isometric":{"phase":"holding","rep":2,"total_reps":3,'
+        '"remaining_ms":2450}}]}';
+
+    final isometric =
+        RobotTelemetryFrame.tryParse(line)?.jointForPart('rElbow')?.isometric;
+
+    expect(isometric?.phase, IsometricPhase.holding);
+    expect(isometric?.rep, 2);
+    expect(isometric?.totalReps, 3);
+    expect(isometric?.remainingMs, 2450);
+  });
+
+  test('keeps joint telemetry usable when isometric status is malformed', () {
+    const line = '{"arm":"RIGHT","state":[{"id":2,"online":1,"pos":0.1,'
+        '"vel":0.0,"tau_cmd":2.2,"tau_meas":2.0,'
+        '"isometric":{"phase":"unknown","rep":2,"total_reps":3,'
+        '"remaining_ms":2450}}]}';
+
+    final joint = RobotTelemetryFrame.tryParse(line)?.jointForPart('rElbow');
+
+    expect(joint, isNotNull);
+    expect(joint?.isometric, isNull);
   });
 }
