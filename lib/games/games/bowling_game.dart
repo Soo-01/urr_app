@@ -54,13 +54,13 @@ class BowlingFlameGame extends FlameGame {
   final Random _rng = Random();
 
   // 조준 단계
-  double _aimX = 0.5;           // 팔꿈치 정규화 위치 (0~1)
-  double _aimHoldTimer = 0.0;   // 조준 유지 타이머
-  double _lockedAimX = 0.5;     // 확정된 조준 X
+  double _aimX = 0.5; // 팔꿈치 정규화 위치 (0~1)
+  double _aimHoldTimer = 0.0; // 조준 유지 타이머
+  double _lockedAimX = 0.5; // 확정된 조준 X
 
   // 어깨 스윙 단계
   bool _backswingReached = false;
-  double _releaseSpeed = 0.0;   // 발사 순간 스윙 속도
+  double _releaseSpeed = 0.0; // 발사 순간 스윙 속도
   double _rollTimer = 0.0;
 
   // 결과 단계
@@ -105,7 +105,8 @@ class BowlingFlameGame extends FlameGame {
 
   double get _pinHitRadius {
     const radii = [45.0, 38.0, 30.0, 25.0, 20.0];
-    return radii[(config.difficultyLevel - 1).clamp(0, 4)] * config.targetSizeMultiplier;
+    return radii[(config.difficultyLevel - 1).clamp(0, 4)] *
+        config.targetSizeMultiplier;
   }
 
   double get _backswingZone => 0.25; // 어깨 정규화 각도 < 이 값 = 백스윙 달성
@@ -132,8 +133,10 @@ class BowlingFlameGame extends FlameGame {
 
     // 조준선
     _aimLine = _AimLine(
-      startX: size.x / 2, startY: _ballBaseY - 20,
-      endY: _pinZoneY + 30, screenWidth: size.x,
+      startX: size.x / 2,
+      startY: _ballBaseY - 20,
+      endY: _pinZoneY + 30,
+      screenWidth: size.x,
     );
     if (config.cognitiveLevel.showAimLine) add(_aimLine);
 
@@ -149,7 +152,8 @@ class BowlingFlameGame extends FlameGame {
     _scoreText = _HudText('점수: 0', Vector2(20, 14), Anchor.topLeft, 20);
     add(_scoreText);
 
-    _frameText = _HudText('1프레임', Vector2(size.x / 2, 14), Anchor.topCenter, 16);
+    _frameText =
+        _HudText('1프레임', Vector2(size.x / 2, 14), Anchor.topCenter, 16);
     add(_frameText);
 
     _phaseText = _HudText('팔꿈치로 조준하세요', Vector2(size.x / 2, size.y - 20),
@@ -172,10 +176,9 @@ class BowlingFlameGame extends FlameGame {
     _phase = _Phase.aiming;
     _aimHoldTimer = 0;
     _backswingReached = false;
-    onJointSwitch?.call('lElbow');
-    _phaseText.updateText(config.cognitiveLevel.level == 1
-        ? '팔꿈치로 조준하세요'
-        : '팔꿈치: 조준 후 유지하세요');
+    onJointSwitch?.call('rElbow');
+    _phaseText.updateText(
+        config.cognitiveLevel.level == 1 ? '팔꿈치로 조준하세요' : '팔꿈치: 조준 후 유지하세요');
     _aimLine.visible = config.cognitiveLevel.showAimLine;
     _holdGauge.setRatio(0);
   }
@@ -184,10 +187,9 @@ class BowlingFlameGame extends FlameGame {
     _phase = _Phase.backswing;
     _lockedAimX = _aimX;
     _aimLine.visible = false;
-    onJointSwitch?.call('lShoulderEF');
-    _phaseText.updateText(config.cognitiveLevel.level == 1
-        ? '어깨를 뒤로 당기세요'
-        : '어깨 백스윙 → 앞으로 던지세요');
+    onJointSwitch?.call('rShoulderEF');
+    _phaseText.updateText(
+        config.cognitiveLevel.level == 1 ? '어깨를 뒤로 당기세요' : '어깨 백스윙 → 앞으로 던지세요');
     _holdGauge.setRatio(0);
   }
 
@@ -209,12 +211,15 @@ class BowlingFlameGame extends FlameGame {
     _resultTimer = 0;
     _pinsKnockedThisFrame = _checkPinCollisions();
     _pinsKnockedTotal += _pinsKnockedThisFrame;
-    score += _pinsKnockedThisFrame * (_pinsKnockedThisFrame == _pinCount ? 2 : 1);
+    score +=
+        _pinsKnockedThisFrame * (_pinsKnockedThisFrame == _pinCount ? 2 : 1);
     _scoreText.updateText('점수: $score');
     _framesPlayed++;
     _frameText.updateText('$_framesPlayed프레임');
 
-    final label = _pinsKnockedThisFrame == _pinCount ? '스트라이크!' : '$_pinsKnockedThisFrame개!';
+    final label = _pinsKnockedThisFrame == _pinCount
+        ? '스트라이크!'
+        : '$_pinsKnockedThisFrame개!';
     _phaseText.updateText(label);
 
     if (config.cognitiveLevel.particleCount > 0 && _pinsKnockedThisFrame > 0) {
@@ -224,7 +229,9 @@ class BowlingFlameGame extends FlameGame {
 
   void _resetFrame() {
     _ball.resetTo(Vector2(size.x / 2, _ballBaseY));
-    for (final pin in _pins) { pin.removeFromParent(); }
+    for (final pin in _pins) {
+      pin.removeFromParent();
+    }
     _pins.clear();
     _spawnPins();
     _switchToAiming();
@@ -374,9 +381,12 @@ class BowlingFlameGame extends FlameGame {
             to: 0,
             child: fp.CircleParticle(
               radius: 3 + _rng.nextDouble() * 4,
-              paint: Paint()..color = [
-                Colors.white, Colors.amber, Colors.red,
-              ][_rng.nextInt(3)],
+              paint: Paint()
+                ..color = [
+                  Colors.white,
+                  Colors.amber,
+                  Colors.red,
+                ][_rng.nextInt(3)],
             ),
           ),
         ),
@@ -390,12 +400,16 @@ class BowlingFlameGame extends FlameGame {
     _sub?.cancel();
     onJointSwitch?.call('x');
     onGameEnd(GameResult(
-      gameId: 'bowling', score: score,
+      gameId: 'bowling',
+      score: score,
       maxPossibleScore: _framesPlayed * _pinCount * 2,
-      accuracy: _framesPlayed > 0 ? _pinsKnockedTotal / (_framesPlayed * _pinCount) : 0,
+      accuracy: _framesPlayed > 0
+          ? _pinsKnockedTotal / (_framesPlayed * _pinCount)
+          : 0,
       duration: config.gameDuration,
       difficultyLevel: config.difficultyLevel,
-      bodyPart: config.bodyPart, timestamp: DateTime.now(),
+      bodyPart: config.bodyPart,
+      timestamp: DateTime.now(),
       calibrationMin: config.normalizer.minAngle,
       calibrationMax: config.normalizer.maxAngle,
       hits: _pinsKnockedTotal,
@@ -408,12 +422,16 @@ class BowlingFlameGame extends FlameGame {
   }
 
   @override
-  void onRemove() { _sub?.cancel(); super.onRemove(); }
+  void onRemove() {
+    _sub?.cancel();
+    super.onRemove();
+  }
 }
 
 // ─── Components ───
 
-class _BowlingBall extends PositionComponent with HasGameReference<BowlingFlameGame> {
+class _BowlingBall extends PositionComponent
+    with HasGameReference<BowlingFlameGame> {
   // rolling-ball-assets: ball_red_large/alt — 64×64 고화질 스프라이트
   final List<Sprite> _frames = [];
   double? _targetX;
@@ -426,7 +444,11 @@ class _BowlingBall extends PositionComponent with HasGameReference<BowlingFlameG
   double _trailTimer = 0;
 
   _BowlingBall({required Vector2 pos})
-      : super(position: pos, size: Vector2.all(72), anchor: Anchor.center, priority: 10);
+      : super(
+            position: pos,
+            size: Vector2.all(72),
+            anchor: Anchor.center,
+            priority: 10);
 
   @override
   Future<void> onLoad() async {
@@ -442,7 +464,10 @@ class _BowlingBall extends PositionComponent with HasGameReference<BowlingFlameG
     if (!_rolling) position.x += (x - position.x) * 8 * dt;
   }
 
-  void startRolling({required double targetX, required double targetY, required double speed}) {
+  void startRolling(
+      {required double targetX,
+      required double targetY,
+      required double speed}) {
     _targetX = targetX;
     _targetY = targetY;
     _rollSpeed = speed;
@@ -510,38 +535,56 @@ class _BowlingBall extends PositionComponent with HasGameReference<BowlingFlameG
     canvas.rotate(_rotation);
 
     // 그림자
-    canvas.drawCircle(Offset(4, 6), r * 0.85,
-        Paint()..color = Colors.black.withValues(alpha: 0.4)
+    canvas.drawCircle(
+        Offset(4, 6),
+        r * 0.85,
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.4)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
 
     // 글로우 (조준 중: 주황, 발사 중: 흰색)
     final glowColor = _rolling
         ? Colors.white.withValues(alpha: 0.4)
         : const Color(0xFFFF8F00).withValues(alpha: 0.35);
-    canvas.drawCircle(Offset.zero, r + 10,
-        Paint()..color = glowColor
+    canvas.drawCircle(
+        Offset.zero,
+        r + 10,
+        Paint()
+          ..color = glowColor
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14));
 
     if (_frames.isNotEmpty) {
       final frameIdx = (_rotation * 2).toInt().abs() % _frames.length;
-      _frames[frameIdx].render(canvas,
-          position: Vector2(-r, -r), size: Vector2.all(r * 2));
+      _frames[frameIdx]
+          .render(canvas, position: Vector2(-r, -r), size: Vector2.all(r * 2));
     } else {
       // 폴백: 고품질 커스텀 볼링공
-      final ballPaint = Paint()..shader = RadialGradient(
-        center: const Alignment(-0.3, -0.4),
-        radius: 0.8,
-        colors: const [Color(0xFF9C3A2C), Color(0xFF6B1A10), Color(0xFF3D0A05)],
-      ).createShader(Rect.fromCircle(center: Offset.zero, radius: r));
+      final ballPaint = Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.3, -0.4),
+          radius: 0.8,
+          colors: const [
+            Color(0xFF9C3A2C),
+            Color(0xFF6B1A10),
+            Color(0xFF3D0A05)
+          ],
+        ).createShader(Rect.fromCircle(center: Offset.zero, radius: r));
       canvas.drawCircle(Offset.zero, r, ballPaint);
       // 하이라이트
-      canvas.drawCircle(const Offset(-10, -12), r * 0.28,
-          Paint()..color = Colors.white.withValues(alpha: 0.25)
+      canvas.drawCircle(
+          const Offset(-10, -12),
+          r * 0.28,
+          Paint()
+            ..color = Colors.white.withValues(alpha: 0.25)
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
       // 손가락 구멍
-      for (final offset in [const Offset(-8, -6), const Offset(4, -10), const Offset(9, 3)]) {
-        canvas.drawCircle(offset, 5,
-            Paint()..color = Colors.black.withValues(alpha: 0.6));
+      for (final offset in [
+        const Offset(-8, -6),
+        const Offset(4, -10),
+        const Offset(9, 3)
+      ]) {
+        canvas.drawCircle(
+            offset, 5, Paint()..color = Colors.black.withValues(alpha: 0.6));
       }
     }
     canvas.restore();
@@ -569,37 +612,53 @@ class _BowlingPin extends PositionComponent {
     if (knocked) return;
     // 그림자
     canvas.drawOval(
-      Rect.fromCenter(center: Offset(2, radius * 1.15), width: radius * 0.8, height: radius * 0.18),
-      Paint()..color = Colors.black.withValues(alpha: 0.5)
+      Rect.fromCenter(
+          center: Offset(2, radius * 1.15),
+          width: radius * 0.8,
+          height: radius * 0.18),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.5)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
     // 핀 몸통 (흰색 — 광택 그라디언트)
-    final bodyRect = Rect.fromCenter(center: Offset.zero, width: radius * 1.1, height: radius * 2.4);
-    canvas.drawOval(bodyRect,
-      Paint()..shader = const LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-        colors: [Color(0xFFCCCCCC), Color(0xFFFFFFFF), Color(0xFFEEEEEE)],
-        stops: [0.0, 0.4, 1.0],
-      ).createShader(bodyRect),
+    final bodyRect = Rect.fromCenter(
+        center: Offset.zero, width: radius * 1.1, height: radius * 2.4);
+    canvas.drawOval(
+      bodyRect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFFCCCCCC), Color(0xFFFFFFFF), Color(0xFFEEEEEE)],
+          stops: [0.0, 0.4, 1.0],
+        ).createShader(bodyRect),
     );
     // 빨간 줄무늬
     canvas.drawOval(
-      Rect.fromCenter(center: Offset(0, -radius * 0.22),
-          width: radius * 0.75, height: radius * 0.38),
+      Rect.fromCenter(
+          center: Offset(0, -radius * 0.22),
+          width: radius * 0.75,
+          height: radius * 0.38),
       Paint()..color = const Color(0xFFCC0000),
     );
     // 머리
-    canvas.drawCircle(Offset(0, -radius * 0.85), radius * 0.34,
-        Paint()..shader = const RadialGradient(
-          center: Alignment(-0.3, -0.3),
-          colors: [Color(0xFFFFFFFF), Color(0xFFDDDDDD)],
-        ).createShader(Rect.fromCircle(center: Offset(0, -radius * 0.85), radius: radius * 0.34)));
+    canvas.drawCircle(
+        Offset(0, -radius * 0.85),
+        radius * 0.34,
+        Paint()
+          ..shader = const RadialGradient(
+            center: Alignment(-0.3, -0.3),
+            colors: [Color(0xFFFFFFFF), Color(0xFFDDDDDD)],
+          ).createShader(Rect.fromCircle(
+              center: Offset(0, -radius * 0.85), radius: radius * 0.34)));
     // 핀 광택 (하이라이트)
     canvas.drawOval(
-      Rect.fromCenter(center: Offset(-radius * 0.2, -radius * 0.5),
-          width: radius * 0.25, height: radius * 0.6),
-      Paint()..color = Colors.white.withValues(alpha: 0.4)
+      Rect.fromCenter(
+          center: Offset(-radius * 0.2, -radius * 0.5),
+          width: radius * 0.25,
+          height: radius * 0.6),
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.4)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
     );
   }
@@ -613,9 +672,12 @@ class _AimLine extends PositionComponent {
   bool visible = true;
 
   _AimLine({
-    required double startX, required this.startY,
-    required this.endY, required this.screenWidth,
-  }) : _x = startX, super(priority: 3);
+    required double startX,
+    required this.startY,
+    required this.endY,
+    required this.screenWidth,
+  })  : _x = startX,
+        super(priority: 3);
 
   void updateX(double x) => _x = x;
 
@@ -652,7 +714,8 @@ class _HoldGauge extends PositionComponent {
     const h = 6.0;
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(cx, cy), width: w, height: h),
+      RRect.fromRectAndRadius(
+          Rect.fromCenter(center: Offset(cx, cy), width: w, height: h),
           const Radius.circular(3)),
       Paint()..color = Colors.white24,
     );
@@ -682,7 +745,8 @@ class _SwingMeter extends PositionComponent {
 
     // 배경 트랙
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: w, height: h),
+      RRect.fromRectAndRadius(
+          Rect.fromCenter(center: Offset.zero, width: w, height: h),
           const Radius.circular(8)),
       Paint()..color = Colors.white12,
     );
@@ -697,12 +761,12 @@ class _SwingMeter extends PositionComponent {
 
     // 현재 위치
     final markerY = h / 2 - _ratio * h;
-    canvas.drawCircle(Offset(0, markerY), w / 2,
-        Paint()..color = Colors.amber);
+    canvas.drawCircle(Offset(0, markerY), w / 2, Paint()..color = Colors.amber);
 
     // 레이블
     TextPaint(style: GoogleFonts.orbitron(fontSize: 9, color: Colors.white54))
-        .render(canvas, 'SWING', Vector2(0, -h / 2 - 14), anchor: Anchor.center);
+        .render(canvas, 'SWING', Vector2(0, -h / 2 - 14),
+            anchor: Anchor.center);
   }
 }
 
@@ -712,7 +776,8 @@ class _LaneBackground extends PositionComponent {
   Sprite? _tileSprite;
 
   _LaneBackground({required Vector2 gameSize})
-      : _gs = gameSize, super(priority: -10);
+      : _gs = gameSize,
+        super(priority: -10);
 
   @override
   Future<void> onLoad() async {
@@ -737,7 +802,8 @@ class _LaneBackground extends PositionComponent {
         }
       }
       // 어두운 오버레이로 깊이감 추가
-      canvas.drawRect(rect, Paint()..color = Colors.black.withValues(alpha: 0.35));
+      canvas.drawRect(
+          rect, Paint()..color = Colors.black.withValues(alpha: 0.35));
 
       // 레인 화살표 마커 (볼링장 공식 마커)
       final arrowPaint = Paint()
@@ -756,11 +822,14 @@ class _LaneBackground extends PositionComponent {
       }
     } else {
       // 폴백: 나무 그라디언트
-      canvas.drawRect(rect, Paint()..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0xFF3E2409), Color(0xFF5C3510), Color(0xFF7A4A1A)],
-      ).createShader(rect));
+      canvas.drawRect(
+          rect,
+          Paint()
+            ..shader = const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF3E2409), Color(0xFF5C3510), Color(0xFF7A4A1A)],
+            ).createShader(rect));
     }
 
     // 레인 수직선 (나무결 느낌)
@@ -773,7 +842,9 @@ class _LaneBackground extends PositionComponent {
     }
 
     // 레인 테두리 (양쪽 거터)
-    final gutterPaint = Paint()..color = Colors.black54..strokeWidth = 8;
+    final gutterPaint = Paint()
+      ..color = Colors.black54
+      ..strokeWidth = 8;
     canvas.drawLine(Offset.zero, Offset(0, _gs.y), gutterPaint);
     canvas.drawLine(Offset(_gs.x, 0), Offset(_gs.x, _gs.y), gutterPaint);
 
@@ -781,21 +852,33 @@ class _LaneBackground extends PositionComponent {
     canvas.drawLine(
       Offset(0, _gs.y * 0.78),
       Offset(_gs.x, _gs.y * 0.78),
-      Paint()..color = Colors.redAccent.withValues(alpha: 0.85)..strokeWidth = 2.5,
+      Paint()
+        ..color = Colors.redAccent.withValues(alpha: 0.85)
+        ..strokeWidth = 2.5,
     );
 
     // 파울 라인 레이블
-    TextPaint(style: const TextStyle(
-      fontSize: 9, color: Colors.redAccent, letterSpacing: 2,
-    )).render(canvas, 'FOUL LINE',
-        Vector2(_gs.x / 2, _gs.y * 0.78 - 10), anchor: Anchor.bottomCenter);
+    TextPaint(
+        style: const TextStyle(
+      fontSize: 9,
+      color: Colors.redAccent,
+      letterSpacing: 2,
+    )).render(canvas, 'FOUL LINE', Vector2(_gs.x / 2, _gs.y * 0.78 - 10),
+        anchor: Anchor.bottomCenter);
 
     // 핀 존 표시 (반원 아치)
     canvas.drawArc(
-      Rect.fromCenter(center: Offset(_gs.x / 2, _gs.y * 0.12),
-          width: _gs.x * 0.55, height: 24),
-      0, pi, false,
-      Paint()..color = Colors.white24..strokeWidth = 1.5..style = PaintingStyle.stroke,
+      Rect.fromCenter(
+          center: Offset(_gs.x / 2, _gs.y * 0.12),
+          width: _gs.x * 0.55,
+          height: 24),
+      0,
+      pi,
+      false,
+      Paint()
+        ..color = Colors.white24
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke,
     );
   }
 }
@@ -810,8 +893,11 @@ class _HudText extends PositionComponent {
   @override
   void render(Canvas canvas) {
     if (_text.isEmpty) return;
-    TextPaint(style: GoogleFonts.orbitron(
-      fontSize: fontSize, color: Colors.white, fontWeight: FontWeight.bold,
+    TextPaint(
+        style: GoogleFonts.orbitron(
+      fontSize: fontSize,
+      color: Colors.white,
+      fontWeight: FontWeight.bold,
       shadows: const [Shadow(color: Colors.black87, blurRadius: 6)],
     )).render(canvas, _text, Vector2.zero(), anchor: anchor);
   }
@@ -826,7 +912,8 @@ extension _CogExt on CognitiveLevel {
 class BowlingGame extends StatefulWidget {
   final BluetoothService bluetoothService;
   final GameConfig config;
-  const BowlingGame({super.key, required this.bluetoothService, required this.config});
+  const BowlingGame(
+      {super.key, required this.bluetoothService, required this.config});
   @override
   State<BowlingGame> createState() => _BowlingGameState();
 }
@@ -836,7 +923,7 @@ class _BowlingGameState extends State<BowlingGame> {
   late GameMotorController _motor;
   double _simValue = 0.5;
   bool _isSim = false;
-  String _currentJoint = 'lElbow';
+  String _currentJoint = 'rElbow';
   String _phaseLabel = '팔꿈치 조준';
 
   @override
@@ -859,17 +946,20 @@ class _BowlingGameState extends State<BowlingGame> {
         if (!mounted) return;
         if (joint == 'x') {
           _motor.safeStop();
-          setState(() { _phaseLabel = '결과'; });
+          setState(() {
+            _phaseLabel = '결과';
+          });
           return;
         }
         _motor.selectJoint(joint);
         setState(() {
           _currentJoint = joint;
-          _phaseLabel = joint == 'lElbow' ? '팔꿈치 조준' : '어깨 스윙';
+          _phaseLabel = joint == 'rElbow' ? '팔꿈치 조준' : '어깨 스윙';
         });
       },
       onGameEnd: (r) {
-        _motor.safeStop(); _motor.dispose();
+        _motor.safeStop();
+        _motor.dispose();
         if (mounted) {
           Navigator.pushReplacement(context,
               MaterialPageRoute(builder: (_) => GameResultScreen(result: r)));
@@ -878,13 +968,17 @@ class _BowlingGameState extends State<BowlingGame> {
     );
 
     if (!_isSim) {
-      _motor.selectJoint('lElbow');
+      _motor.selectJoint('rElbow');
       _motor.startWatchdog();
     }
   }
 
   @override
-  void dispose() { _motor.safeStop(); _motor.dispose(); super.dispose(); }
+  void dispose() {
+    _motor.safeStop();
+    _motor.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -899,10 +993,14 @@ class _BowlingGameState extends State<BowlingGame> {
           _controlBar(loc),
         ]),
         Positioned(
-          right: 16, bottom: 80,
+          right: 16,
+          bottom: 80,
           child: FloatingActionButton(
             backgroundColor: Colors.red,
-            onPressed: () { _motor.emergencyStop(); _game.endGame(); },
+            onPressed: () {
+              _motor.emergencyStop();
+              _game.endGame();
+            },
             child: const Icon(Icons.stop, color: Colors.white, size: 32),
           ),
         ),
@@ -911,82 +1009,100 @@ class _BowlingGameState extends State<BowlingGame> {
   }
 
   Widget _jointIndicator() => Container(
-    color: const Color(0xFF1A0A00),
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-      _JointChip(label: '팔꿈치 조준', active: _currentJoint == 'lElbow',
-          color: Colors.orange),
-      const SizedBox(width: 16),
-      const Icon(Icons.arrow_forward, color: Colors.white38, size: 16),
-      const SizedBox(width: 16),
-      _JointChip(label: '어깨 스윙', active: _currentJoint == 'lShoulderEF',
-          color: Colors.amber),
-      const SizedBox(width: 16),
-      Text(_phaseLabel,
-          style: const TextStyle(color: Colors.white54, fontSize: 11)),
-    ]),
-  );
+        color: const Color(0xFF1A0A00),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _JointChip(
+              label: '팔꿈치 조준',
+              active: _currentJoint == 'rElbow',
+              color: Colors.orange),
+          const SizedBox(width: 16),
+          const Icon(Icons.arrow_forward, color: Colors.white38, size: 16),
+          const SizedBox(width: 16),
+          _JointChip(
+              label: '어깨 스윙',
+              active: _currentJoint == 'rShoulderEF',
+              color: Colors.amber),
+          const SizedBox(width: 16),
+          Text(_phaseLabel,
+              style: const TextStyle(color: Colors.white54, fontSize: 11)),
+        ]),
+      );
 
   Widget _simSlider() => Container(
-    color: const Color(0xFF1A0A00),
-    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
-    child: Column(children: [
-      Text('시뮬레이션: $_phaseLabel (${(_simValue * 100).toInt()}%)',
-          style: const TextStyle(color: Colors.amber, fontSize: 12)),
-      SliderTheme(
-        data: SliderThemeData(
-          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 16),
-          trackHeight: 8,
-          activeTrackColor: _currentJoint == 'lElbow' ? Colors.orange : Colors.amber,
-          thumbColor: Colors.white,
-          inactiveTrackColor: Colors.white24,
-        ),
-        child: Slider(
-          value: _simValue,
-          onChanged: (v) { setState(() => _simValue = v); _game.setSimAngle(v); },
-        ),
-      ),
-    ]),
-  );
+        color: const Color(0xFF1A0A00),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
+        child: Column(children: [
+          Text('시뮬레이션: $_phaseLabel (${(_simValue * 100).toInt()}%)',
+              style: const TextStyle(color: Colors.amber, fontSize: 12)),
+          SliderTheme(
+            data: SliderThemeData(
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 16),
+              trackHeight: 8,
+              activeTrackColor:
+                  _currentJoint == 'rElbow' ? Colors.orange : Colors.amber,
+              thumbColor: Colors.white,
+              inactiveTrackColor: Colors.white24,
+            ),
+            child: Slider(
+              value: _simValue,
+              onChanged: (v) {
+                setState(() => _simValue = v);
+                _game.setSimAngle(v);
+              },
+            ),
+          ),
+        ]),
+      );
 
   Widget _controlBar(AppLocalizations loc) => Container(
-    color: const Color(0xFF1A0A00),
-    padding: const EdgeInsets.only(bottom: 6, top: 2),
-    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-      ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white12, foregroundColor: Colors.white),
-        onPressed: () => setState(() => _game.isRunning = !_game.isRunning),
-        icon: const Icon(Icons.pause), label: Text(loc.pauseGame),
-      ),
-      const SizedBox(width: 16),
-      OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent,
-            side: const BorderSide(color: Colors.redAccent)),
-        onPressed: () { _motor.safeStop(); _game.endGame(); },
-        icon: const Icon(Icons.stop), label: Text(loc.stop),
-      ),
-    ]),
-  );
+        color: const Color(0xFF1A0A00),
+        padding: const EdgeInsets.only(bottom: 6, top: 2),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white12, foregroundColor: Colors.white),
+            onPressed: () => setState(() => _game.isRunning = !_game.isRunning),
+            icon: const Icon(Icons.pause),
+            label: Text(loc.pauseGame),
+          ),
+          const SizedBox(width: 16),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.redAccent,
+                side: const BorderSide(color: Colors.redAccent)),
+            onPressed: () {
+              _motor.safeStop();
+              _game.endGame();
+            },
+            icon: const Icon(Icons.stop),
+            label: Text(loc.stop),
+          ),
+        ]),
+      );
 }
 
 class _JointChip extends StatelessWidget {
   final String label;
   final bool active;
   final Color color;
-  const _JointChip({required this.label, required this.active, required this.color});
+  const _JointChip(
+      {required this.label, required this.active, required this.color});
   @override
   Widget build(BuildContext context) => AnimatedContainer(
-    duration: const Duration(milliseconds: 200),
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: active ? color.withValues(alpha: 0.25) : Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: active ? color : Colors.white24, width: active ? 1.5 : 1),
-    ),
-    child: Text(label, style: TextStyle(
-      color: active ? color : Colors.white38, fontSize: 12,
-      fontWeight: active ? FontWeight.bold : FontWeight.normal,
-    )),
-  );
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: active ? color.withValues(alpha: 0.25) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: active ? color : Colors.white24, width: active ? 1.5 : 1),
+        ),
+        child: Text(label,
+            style: TextStyle(
+              color: active ? color : Colors.white38,
+              fontSize: 12,
+              fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            )),
+      );
 }

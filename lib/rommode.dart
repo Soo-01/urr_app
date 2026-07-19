@@ -1,16 +1,14 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'bluetooth.dart';
 import 'generated/l10n.dart';
-import 'dart:async';  // 25.06.02 추가내용
-import 'dart:convert';  // 25.08.25 추가내용
+import 'dart:async'; // 25.06.02 추가내용
 // import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';  // 25.08.25 추가내용
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import 'main.dart';
-import 'record.dart';
-
+// import 'record.dart'; // 더미 ROM 기록 기능 비활성화 중
+import 'robot_command_service.dart';
+import 'robot_protocol.dart';
 
 class ROMModeSelectScreen extends StatefulWidget {
   final BluetoothService bluetoothService;
@@ -38,12 +36,12 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
   double? _currentAngle;
   double? _minAngle;
   double? _maxAngle;
-  StreamSubscription<String>? _btSubscription;
+  StreamSubscription<RobotTelemetryFrame>? _btSubscription;
   bool _isMeasuring = false;
   bool _activeRom = false;
   bool _passiveRom = false;
   String? _selectedPart;
-
+  late final RobotCommandService _robotCommands;
 
   Widget rangeBar(double? minAngle, double? maxAngle, double? current) {
     if (minAngle == null || maxAngle == null) {
@@ -60,7 +58,7 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
     // -100~100 → 0.0~1.0 정규화
     double norm(double a) => ((a + 100) / 200).clamp(0.0, 1.0);
     final start = norm(minAngle);
-    final end   = norm(maxAngle);
+    final end = norm(maxAngle);
     final curNorm = current != null ? norm(current) : null;
 
     return SizedBox(
@@ -68,7 +66,7 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
-          final left  = width * math.min(start, end);
+          final left = width * math.min(start, end);
           final right = width * (1.0 - math.max(start, end));
           final curX = curNorm != null ? (curNorm * width) : null;
 
@@ -104,7 +102,7 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                   child: Container(
                     width: 6,
                     decoration: BoxDecoration(
-                      color: Colors.white,           // marker 색상
+                      color: Colors.white, // marker 색상
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
@@ -115,8 +113,6 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
       ),
     );
   }
-
-
 
   // void _selectMode(String mode) {
   //   setState(() {
@@ -129,16 +125,9 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
   //     _sendModeDataToBluetooth('Stop');
   //   }
   // }
-  void _selectMode(String mode) {
+  Future<void> _selectMode(String mode) async {
     if (mode == 'Stop') {
-      // 1) 현재 모드에 맞는 종료 커맨드 먼저 전송
-      if (_selectedMode == 'Active ROM' || _selectedMode == 'Passive ROM') {
-        // save 동작에는 이미
-        // Active ROM → arom\n
-        // Passive ROM → x\n
-        // 이 들어가 있으니까 이걸 재활용
-        _saveData('save');
-      }
+      await _robotCommands.stop();
 
       // 2) 측정/스트림/각도 상태 정리
       _btSubscription?.cancel();
@@ -152,10 +141,6 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
         _maxAngle = null;
       });
 
-
-      // softStop 추가
-      _saveData('stop');
-
       // 3) 외부로 모드 변경 알림
       widget.onModeChanged?.call('Stop', '');
     } else {
@@ -165,9 +150,6 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
     }
   }
 
-
-
-
   void _setVelocity(String velocity) {
     setState(() {
       _velocityController[_selectedMode] = velocity;
@@ -175,17 +157,21 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
   }
 
   //0827
-  Future<void> _sendPart(String partCode) async {  //  추후 Jetson에 전송하기 위해 만들어둠. 지금은 딱히 사용 x. Debug print로 출력만 확인
-    // 예: PART:<code> 형식으로 단독 전송
-    final payload = 'PART:$partCode';
-    // await BluetoothService.instance.send(payload);
-    debugPrint('[ROM] send $payload');
+  Future<bool> _sendPart(String partCode) async {
+    final success = await _robotCommands.selectPart(partCode);
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)!.bluetoothFailed)),
+      );
+    }
+    return success;
   }
 
   // 25.06.02 추가내용
   @override
   void initState() {
-  super.initState();
+    super.initState();
+    _robotCommands = RobotCommandService(widget.bluetoothService);
 
     // _btSubscription ??= widget.bluetoothService.dataStream.listen((data) {
     //   final s = data.trim();
@@ -203,7 +189,6 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
     //     });
     //   }
     // });
-
   }
 
   @override
@@ -212,72 +197,7 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
     super.dispose();
   }
 
-
-
-  Future<bool> _sendModeDataToBluetooth(String mode) async {
-    String message;
-    final selectedVelocity = _velocityController[mode] ?? "";
-
-    switch (mode) {
-      case 'PassiveROM':
-        message = 'mode:A,$selectedVelocity';
-        break;
-      case 'ActiveROM':
-        message = 'mode:B';  // message = 'mode:B,$selectedVelocity';
-        break;
-      case 'Stop':
-        message = 'mode:S';
-        break;
-      default:
-        return false;
-    }
-
-    try {
-      final success = await widget.bluetoothService.sendBytes(
-        Uint8List.fromList(message.codeUnits),
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(success
-          ? '${AppLocalizations.of(context)!.bluetoothMessageSent}: $message'
-          : AppLocalizations.of(context)!.bluetoothFailed)),
-      );
-      return success;
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context)!.bluetoothError}: $e')),
-      );
-      return false;
-    }
-  }
-
-  Future<void> _speakCountdown(Function sendAction) async {
-    final loc = AppLocalizations.of(context)!;
-    final tts = FlutterTts();
-    final langCode = loc.localeName == 'ko' ? 'ko-KR' : 'en-US';
-
-    await tts.setLanguage(langCode);
-    await tts.setPitch(1.0);
-    await tts.setVolume(1.0);
-    await tts.awaitSpeakCompletion(true);
-
-    final success = await sendAction();
-
-    if (success) {
-      for (int i = 5; i > 0; i--) {
-        await tts.speak('$i');
-        await tts.awaitSpeakCompletion(true);
-        await Future.delayed(const Duration(milliseconds: 200));
-      }
-    } else {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.bluetoothFailed)),
-      );
-    }
-  }
-
-    Future<void> _saveData(String action) async {
+  Future<bool> _saveData(String action) async {
     final selectedVelocity = _velocityController[_selectedMode];
 
     // if (_selectedMode == 'Stop') return;
@@ -290,13 +210,14 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
     //   return;
     // }
     // 공통: 부위 선택 안 됐으면 바로 경고 후 리턴
-  if (action != 'stop' && _selectedMode != 'Stop' && _selectedPart == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.selectPart)), // arb에 "selectPart" 추가
-    );
-    return;
-  }
-
+    if (action != 'stop' && _selectedMode != 'Stop' && _selectedPart == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(AppLocalizations.of(context)!
+                .selectPart)), // arb에 "selectPart" 추가
+      );
+      return false;
+    }
 
     String? cmd; // 실제로 보낼 문자열
 
@@ -312,38 +233,31 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
       //   _passiveRom = false;
       //   break;
 
-
-      case 'Active ROM': 
+      case 'Active ROM':
         if (action == 'receive') {
-          // Active ROM 시작: arom\n
           if (!_activeRom) {
-            cmd = 'arom\n';
-            _activeRom = true;
+            cmd = RobotProtocol.arom;
           }
         } else if (action == 'save') {
-          // Active ROM 종료: arom\n
           if (_activeRom) {
-            cmd = 'arom\n';
-            _activeRom = false;
+            cmd = RobotProtocol.stop;
           }
         }
         break;
 
       case 'Passive ROM':
         if (action == 'receive') {
-          // Passive ROM 시작: prom\n
           if (!_passiveRom) {
-            cmd = 'prom\n';
-            _passiveRom = true;
+            final speed = (selectedVelocity?.isNotEmpty ?? false)
+                ? RobotProtocol.speedLevelToRadPerSec(selectedVelocity!)
+                : null;
+            cmd = RobotProtocol.prom(speedRadPerSec: speed);
           }
         } else if (action == 'direction') {
-          // 방향 전환: dir\n
-          cmd = 'dir\n';
+          cmd = RobotProtocol.reverseProm;
         } else if (action == 'save') {
-          // Passive ROM 종료: x\n
           if (_passiveRom) {
-            cmd = 'x\n';
-            _passiveRom = false;
+            cmd = RobotProtocol.stop;
           }
         }
         // if ((selectedVelocity?.isNotEmpty ?? false)) {
@@ -362,20 +276,42 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
 
     // softStop 추가
     if (action == 'stop') {
-      cmd = 'stop\n';      // 원하는 softStop 커맨드
-      _activeRom = false;
-      _passiveRom = false;
+      cmd = RobotProtocol.stop;
     }
 
     // 실제로 보낼 명령이 있으면 BT로 전송
     if (cmd != null) {
-      print('[APP TX] $cmd');  //  cmd [arom]/[prom]/[x]/[dir] 이런식으로 잘 넘어가는 지 확인 
-
-      await widget.bluetoothService.sendBytes(
-        Uint8List.fromList(utf8.encode(cmd)),
-      );
+      final part = _selectedPart;
+      final success = action == 'receive' && part != null
+          ? await _robotCommands.sendForPart(part, cmd)
+          : await _robotCommands.send(cmd);
+      if (!success) return false;
+      if (action == 'receive') {
+        _activeRom = _selectedMode == 'Active ROM';
+        _passiveRom = _selectedMode == 'Passive ROM';
+      } else if (action == 'save' || action == 'stop') {
+        _activeRom = false;
+        _passiveRom = false;
+      }
+      return true;
     }
+    return false;
+  }
 
+  void _listenToSelectedJoint() {
+    _btSubscription?.cancel();
+    _btSubscription = widget.bluetoothService.telemetryStream.listen((frame) {
+      final joint = frame.jointForPart(_selectedPart);
+      if (!_isMeasuring || joint == null || !joint.online || !mounted) return;
+      final angle = joint.positionDegrees;
+      final newMin = _minAngle == null ? angle : math.min(_minAngle!, angle);
+      final newMax = _maxAngle == null ? angle : math.max(_maxAngle!, angle);
+      setState(() {
+        _currentAngle = angle;
+        _minAngle = newMin;
+        _maxAngle = newMax;
+      });
+    });
   }
 
   // Future<void> _saveAngleData() async {
@@ -410,9 +346,11 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
   // }
   // rommode.dart 내의 _saveAngleData() 함수를 아래와 같이 수정하세요.
 
+  /* 더미 ROM 기록 기능 비활성화 시작
   Future<void> _saveAngleData() async {
     final loc = AppLocalizations.of(context)!;
-    final userProvider = Provider.of<UserProvider>(context, listen: false); // Provider 호출
+    final userProvider =
+        Provider.of<UserProvider>(context, listen: false); // Provider 호출
 
     if (_selectedMode == 'Stop') return;
 
@@ -424,70 +362,66 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
     //   return;
     // }
     ///////////////////////////////////////////////////////////// record.dart 테스트를 위해 윗 부분 잠시 주석함
-  
+
     // ---------------------------------------------------------
     // 2. [테스트용 더미 데이터 설정 및 저장 연동]
     double dummyMinAngle = 10.5; // 가짜 최소 각도
     double dummyMaxAngle = 135.0; // 가짜 최대 각도
 
-    
-    String currentVelocity = _selectedMode == 'Passive ROM' 
-        ? (_velocityController['Passive ROM'] ?? 'N/A') 
+    String currentVelocity = _selectedMode == 'Passive ROM'
+        ? (_velocityController['Passive ROM'] ?? 'N/A')
         : 'N/A';
     String details = 'Velocity: $currentVelocity'; // 필요시 Intensity 등 추가 가능
 
     // record.dart의 RecordManager를 호출하여 누적 저장합니다.
-    await RecordManager.saveRecord(
-      UserRecord(
-        timestamp: DateTime.now(),
-        // userName: '테스트유저', // 임시 사용자 이름 (나중엔 프로필 연동 필요)
-        userName: userProvider.name ?? 'Unknown',
-        recordType: _selectedMode, // 'Passive ROM' 또는 'Active ROM'
-        joint: _selectedPart ?? '관절 미선택', // 드롭다운에서 선택한 관절
-        minAngle: dummyMinAngle, // 실제 구동 시엔 _minAngle! 로 복구
-        maxAngle: dummyMaxAngle, // 실제 구동 시엔 _maxAngle! 로 복구
-        // extraData: '테스트용 가짜 데이터입니다.',
-        extraData: details, // ★ Selected Mode Settings의 내용들이 여기에 같이 저장됨
-      )
-    );
+    await RecordManager.saveRecord(UserRecord(
+      timestamp: DateTime.now(),
+      // userName: '테스트유저', // 임시 사용자 이름 (나중엔 프로필 연동 필요)
+      userName: userProvider.name,
+      recordType: _selectedMode, // 'Passive ROM' 또는 'Active ROM'
+      joint: _selectedPart ?? '관절 미선택', // 드롭다운에서 선택한 관절
+      minAngle: dummyMinAngle, // 실제 구동 시엔 _minAngle! 로 복구
+      maxAngle: dummyMaxAngle, // 실제 구동 시엔 _maxAngle! 로 복구
+      // extraData: '테스트용 가짜 데이터입니다.',
+      extraData: details, // ★ Selected Mode Settings의 내용들이 여기에 같이 저장됨
+    ));
     // ---------------------------------------------------------
-
-
 
     final now = DateTime.now().toString().split(' ')[0];
     // final angleRange = '${_minAngle!.toStringAsFixed(1)}° ~ ${_maxAngle!.toStringAsFixed(1)}°'; /// record.dart 테스트를 위해 윗 부분 잠시 주석함
-    final angleRange = '${dummyMinAngle.toStringAsFixed(1)}° ~ ${dummyMaxAngle.toStringAsFixed(1)}°';
-
-
+    final angleRange =
+        '${dummyMinAngle.toStringAsFixed(1)}° ~ ${dummyMaxAngle.toStringAsFixed(1)}°';
 
     // ★ 1. Passive ROM과 Active ROM 구분하여 UserProvider에 데이터 저장
     if (_selectedMode == 'Passive ROM') {
       // 속도가 선택되지 않았을 경우를 대비한 기본값 처리
-      final velocity = _velocityController['Passive ROM']?.isNotEmpty == true 
-          ? _velocityController['Passive ROM']! 
+      final velocity = _velocityController['Passive ROM']?.isNotEmpty == true
+          ? _velocityController['Passive ROM']!
           : 'N/A';
-          
+
       userProvider.updateProm(
-        _selectedPart!, 
-        velocity, 
-        // _minAngle!, 
-        // _maxAngle!
-        dummyMinAngle, // _minAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
-        dummyMaxAngle  // _maxAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
-      );
+          _selectedPart!,
+          velocity,
+          // _minAngle!,
+          // _maxAngle!
+          dummyMinAngle, // _minAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
+          dummyMaxAngle // _maxAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
+          );
     } else if (_selectedMode == 'Active ROM') {
       userProvider.updateArom(
-        _selectedPart!, 
-        // _minAngle!, 
-        // _maxAngle!
-        dummyMinAngle, // _minAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
-        dummyMaxAngle  // _maxAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
-      );
+          _selectedPart!,
+          // _minAngle!,
+          // _maxAngle!
+          dummyMinAngle, // _minAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
+          dummyMaxAngle // _maxAngle! 대신 더미값 사용  /// record.dart 테스트를 위해 잠시 주석함
+          );
     }
 
     debugPrint('[$now] ${loc.measuredROM}: $angleRange');
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${loc.savedROM}: $angleRange\n($_selectedMode 저장 완료)')),
+      SnackBar(
+          content:
+              Text('${loc.savedROM}: $angleRange\n($_selectedMode 저장 완료)')),
     );
 
     // 저장 후 초기화하고 측정 종료
@@ -495,6 +429,7 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
       _isMeasuring = false;
     });
   }
+  더미 ROM 기록 기능 비활성화 끝 */
 
 //////////////////////////////////////////////////////////////////////////////////
   @override
@@ -506,7 +441,7 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
       switch (mode.toLowerCase()) {
         case 'passive rom':
           return loc.passiverom;
-          
+
         case 'active rom':
           return loc.activerom;
         case 'stop':
@@ -516,21 +451,20 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
       }
     }
 
-  //   String getPartLabel(String part) {  // 지금은 사용 안함. 나중에 필요할 수도?
-  //   switch (part) {
-  //     case 'lShoulderEF':
-  //       return loc.lShoulderEF; // "Left Shoulder Ext/Flx"
-  //     case 'lShoulderRo':
-  //       return loc.lShoulderRo; // "Left Shoulder Int/Ext Rotation"
-  //     case 'lElbow':
-  //       return loc.lElbow;      // "Left Elbow Ext/Flx"
-  //     case 'lWrist':
-  //       return loc.lWrist;      // "Left Wrist Ext/Flx"
-  //     default:
-  //       return part;
-  //   }
-  // }
-
+    //   String getPartLabel(String part) {  // 지금은 사용 안함. 나중에 필요할 수도?
+    //   switch (part) {
+    //     case 'lShoulderEF':
+    //       return loc.lShoulderEF; // "Left Shoulder Ext/Flx"
+    //     case 'lShoulderRo':
+    //       return loc.lShoulderRo; // "Left Shoulder Int/Ext Rotation"
+    //     case 'lElbow':
+    //       return loc.lElbow;      // "Left Elbow Ext/Flx"
+    //     case 'lWrist':
+    //       return loc.lWrist;      // "Left Wrist Ext/Flx"
+    //     default:
+    //       return part;
+    //   }
+    // }
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.modeSelect)),
@@ -543,7 +477,6 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Align(
@@ -554,14 +487,22 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                           initialSelection: _selectedPart,
                           hintText: loc.selectPart, // "Select Part"
                           dropdownMenuEntries: [
-                            DropdownMenuEntry(value: 'lShoulderEF', label: loc.lShoulderEF),
-                            DropdownMenuEntry(value: 'lShoulderRo', label: loc.lShoulderRo),
-                            DropdownMenuEntry(value: 'lElbow',      label: loc.lElbow),
-                            DropdownMenuEntry(value: 'lWrist',      label: loc.lWrist),
-                            DropdownMenuEntry(value: 'rShoulderEF', label: loc.rShoulderEF),
-                            DropdownMenuEntry(value: 'rShoulderRo', label: loc.rShoulderRo),
-                            DropdownMenuEntry(value: 'rElbow',      label: loc.rElbow),
-                            DropdownMenuEntry(value: 'rWrist',      label: loc.rWrist),
+                            DropdownMenuEntry(
+                                value: 'lShoulderEF', label: loc.lShoulderEF),
+                            DropdownMenuEntry(
+                                value: 'lShoulderRo', label: loc.lShoulderRo),
+                            DropdownMenuEntry(
+                                value: 'lElbow', label: loc.lElbow),
+                            DropdownMenuEntry(
+                                value: 'lWrist', label: loc.lWrist),
+                            DropdownMenuEntry(
+                                value: 'rShoulderEF', label: loc.rShoulderEF),
+                            DropdownMenuEntry(
+                                value: 'rShoulderRo', label: loc.rShoulderRo),
+                            DropdownMenuEntry(
+                                value: 'rElbow', label: loc.rElbow),
+                            DropdownMenuEntry(
+                                value: 'rWrist', label: loc.rWrist),
                           ],
                           onSelected: (value) async {
                             setState(() => _selectedPart = value);
@@ -573,7 +514,6 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                       ),
                     ),
                   ),
-
                   ...['Passive ROM', 'Active ROM'].map((mode) {
                     final isSelected = _selectedMode == mode;
                     return Padding(
@@ -581,12 +521,14 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 48),
-                          backgroundColor: isSelected ? Colors.blue.shade100 : null,
+                          backgroundColor:
+                              isSelected ? Colors.blue.shade100 : null,
                           side: BorderSide(
                             color: isSelected ? Colors.blue : Colors.grey,
                             width: 2,
                           ),
-                          foregroundColor: isSelected ? Colors.blue.shade900 : Colors.black,
+                          foregroundColor:
+                              isSelected ? Colors.blue.shade900 : Colors.black,
                         ),
                         onPressed: () => _selectMode(mode),
                         child: Text(getModeLabel(mode)),
@@ -594,18 +536,29 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                     );
                   }),
                   const SizedBox(height: 24),
-
                   if (_selectedMode != 'Stop') ...[
                     Text('${loc.mode}: ${getModeLabel(_selectedMode)}',
-                        style: TextStyle(fontSize: 24 * fontSizeFactor, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            fontSize: 24 * fontSizeFactor,
+                            fontWeight: FontWeight.bold)),
                     const SizedBox(height: 24),
-
                     if (_selectedMode == 'Passive ROM') ...[
                       Text(loc.selectVelocity),
                       const SizedBox(height: 16),
                       Wrap(
                         spacing: 10,
-                        children: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'].map((v) {
+                        children: [
+                          '1',
+                          '2',
+                          '3',
+                          '4',
+                          '5',
+                          '6',
+                          '7',
+                          '8',
+                          '9',
+                          '10'
+                        ].map((v) {
                           return ChoiceChip(
                             label: Text('$v'),
                             selected: _velocityController[_selectedMode] == v,
@@ -646,19 +599,25 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    '${loc.minAngle}: ${_minAngle?.toStringAsFixed(1) ?? '-'}°', style: TextStyle(fontSize: 16 * fontSizeFactor),
+                                    '${loc.minAngle}: ${_minAngle?.toStringAsFixed(1) ?? '-'}°',
+                                    style: TextStyle(
+                                        fontSize: 16 * fontSizeFactor),
                                     textAlign: TextAlign.start,
                                   ),
                                 ),
                                 Expanded(
                                   child: Text(
-                                    '${loc.currentAngle}: ${_currentAngle?.toStringAsFixed(1) ?? '-'}°', style: TextStyle(fontSize: 18 * fontSizeFactor),
+                                    '${loc.currentAngle}: ${_currentAngle?.toStringAsFixed(1) ?? '-'}°',
+                                    style: TextStyle(
+                                        fontSize: 18 * fontSizeFactor),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
                                 Expanded(
                                   child: Text(
-                                    '${loc.maxAngle}: ${_maxAngle?.toStringAsFixed(1) ?? '-'}°', style: TextStyle(fontSize: 16 * fontSizeFactor),
+                                    '${loc.maxAngle}: ${_maxAngle?.toStringAsFixed(1) ?? '-'}°',
+                                    style: TextStyle(
+                                        fontSize: 16 * fontSizeFactor),
                                     textAlign: TextAlign.end,
                                   ),
                                 ),
@@ -673,14 +632,22 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: const [
-                                Text('-100'), Text('-75'), Text('-50'), Text('-25'), Text('0'),
-                                Text('25'),  Text('50'),  Text('75'),  Text('100'),
+                                Text('-100'),
+                                Text('-75'),
+                                Text('-50'),
+                                Text('-25'),
+                                Text('0'),
+                                Text('25'),
+                                Text('50'),
+                                Text('75'),
+                                Text('100'),
                               ],
                             ),
-                          ]
-                          
-                           else
-                            Text('${loc.waitMeasurement}', style: TextStyle(fontSize: 18 * fontSizeFactor, color: Colors.grey)),  // const
+                          ] else
+                            Text('${loc.waitMeasurement}',
+                                style: TextStyle(
+                                    fontSize: 18 * fontSizeFactor,
+                                    color: Colors.grey)), // const
                         ],
                       ),
 
@@ -693,10 +660,13 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                             onPressed: _isMeasuring
                                 ? null // 측정 중이면 버튼 비활성화(중복 루프 방지)
                                 : () async {
-                                    await _saveData('receive');  // prom\n 전송
+                                    final sent = await _saveData('receive');
+                                    if (!sent) return;
 
                                     // Passive ROM 모드에서 속도 선택 안 했으면 측정 시작하지 않음
-                                    if (_selectedMode == 'Passive ROM' && _selectedPart == null) {   //   속도 선택 생략   (_velocityController[_selectedMode]?.isEmpty ?? true) || 
+                                    if (_selectedMode == 'Passive ROM' &&
+                                        _selectedPart == null) {
+                                      //   속도 선택 생략   (_velocityController[_selectedMode]?.isEmpty ?? true) ||
                                       return; // 여기서 종료 → _isMeasuring = true 안 됨 → Progress도 안 뜸
                                     }
 
@@ -716,37 +686,13 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                                     //   _passiveRom = true;
                                     // }
 
-
-                                    // 1113
-                                    // 👉 각도 수신용 스트림 구독
-                                    _btSubscription?.cancel();
-                                    _btSubscription = widget.bluetoothService.dataStream.listen((data) {
-                                      final s = data.trim();
-                                      print('[BT RX] "$s"');
-                                      final angle = double.tryParse(s);
-                                      if (angle == null) return;
-
-                                      if (_isMeasuring) { // ★ 측정 중일 때만 UI 반영
-                                        final newMin = (_minAngle == null)
-                                            ? angle
-                                            : (angle < _minAngle! ? angle : _minAngle!);
-
-                                        final newMax = (_maxAngle == null)
-                                            ? angle
-                                            : (angle > _maxAngle! ? angle : _maxAngle!);
-
-                                        setState(() {
-                                          _currentAngle = angle;
-                                          _minAngle = newMin;
-                                          _maxAngle = newMax;
-                                        });
-                                      }
-                                    });
-
+                                    _listenToSelectedJoint();
                                   },
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                              textStyle: TextStyle(fontSize: 18 * fontSizeFactor),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 32, vertical: 16),
+                              textStyle:
+                                  TextStyle(fontSize: 18 * fontSizeFactor),
                             ),
                             child: Text(loc.receive),
                           ),
@@ -757,20 +703,21 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                               // widget.bluetoothService.sendBytes(
                               //   Uint8List.fromList(utf8.encode('dir\n')),   //  방향 전환 버튼
                               // );
-                              _saveData('direction');   // dir\n 전송
+                              _saveData('direction'); // dir\n 전송
                             },
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                              textStyle: TextStyle(fontSize: 18 * fontSizeFactor),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 32, vertical: 16),
+                              textStyle:
+                                  TextStyle(fontSize: 18 * fontSizeFactor),
                             ),
                             child: Text(loc.direction),
                           ),
 
-
                           const SizedBox(width: 20), // 버튼 간 간격
                           ElevatedButton(
                             onPressed: () async {
-                              await _saveData('save');  // x\n 전송
+                              await _saveData('save'); // x\n 전송
 
                               // Passive ROM 동작 정지
                               // if (_passiveRom) {
@@ -784,25 +731,25 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                               _btSubscription?.cancel();
                               _btSubscription = null;
 
-
                               // _isMeasuring = false;   // ← 루프 종료 신호
                               // setState(() {});        // UI 갱신
-                              setState(() => _isMeasuring = false); // ★ 루프 종료 신호  // 측정 종료 플래그
+                              setState(() => _isMeasuring =
+                                  false); // ★ 루프 종료 신호  // 측정 종료 플래그
 
-                              _saveAngleData();
-
+                              // 임시 더미값(10.5°~135.0°) 저장 기능 비활성화.
+                              // 실제 측정값 저장 정책 확정 후 다시 연결합니다.
+                              // await _saveAngleData();
                             },
-
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                              textStyle: TextStyle(fontSize: 18 * fontSizeFactor),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 32, vertical: 16),
+                              textStyle:
+                                  TextStyle(fontSize: 18 * fontSizeFactor),
                             ),
                             child: Text(loc.save),
                           ),
                         ],
                       ),
-
-
                     ] else if (_selectedMode == 'Active ROM') ...[
                       const SizedBox(height: 16),
 
@@ -819,19 +766,25 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    '${loc.minAngle}: ${_minAngle?.toStringAsFixed(1) ?? '-'}°', style: TextStyle(fontSize: 16 * fontSizeFactor),
+                                    '${loc.minAngle}: ${_minAngle?.toStringAsFixed(1) ?? '-'}°',
+                                    style: TextStyle(
+                                        fontSize: 16 * fontSizeFactor),
                                     textAlign: TextAlign.start,
                                   ),
                                 ),
                                 Expanded(
                                   child: Text(
-                                    '${loc.currentAngle}: ${_currentAngle?.toStringAsFixed(1) ?? '-'}°', style: TextStyle(fontSize: 18 * fontSizeFactor),
+                                    '${loc.currentAngle}: ${_currentAngle?.toStringAsFixed(1) ?? '-'}°',
+                                    style: TextStyle(
+                                        fontSize: 18 * fontSizeFactor),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
                                 Expanded(
                                   child: Text(
-                                    '${loc.maxAngle}: ${_maxAngle?.toStringAsFixed(1) ?? '-'}°', style: TextStyle(fontSize: 16 * fontSizeFactor),
+                                    '${loc.maxAngle}: ${_maxAngle?.toStringAsFixed(1) ?? '-'}°',
+                                    style: TextStyle(
+                                        fontSize: 16 * fontSizeFactor),
                                     textAlign: TextAlign.end,
                                   ),
                                 ),
@@ -857,18 +810,26 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
 
                             rangeBar(_minAngle, _maxAngle, _currentAngle),
 
-
                             const SizedBox(height: 4),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: const [
-                                Text('-100'), Text('-75'), Text('-50'), Text('-25'), Text('0'),
-                                Text('25'),  Text('50'),  Text('75'),  Text('100'),
+                                Text('-100'),
+                                Text('-75'),
+                                Text('-50'),
+                                Text('-25'),
+                                Text('0'),
+                                Text('25'),
+                                Text('50'),
+                                Text('75'),
+                                Text('100'),
                               ],
                             ),
-
                           ] else
-                            Text('${loc.waitMeasurement}', style: TextStyle(fontSize: 18 * fontSizeFactor, color: Colors.grey)),  // const
+                            Text('${loc.waitMeasurement}',
+                                style: TextStyle(
+                                    fontSize: 18 * fontSizeFactor,
+                                    color: Colors.grey)), // const
                         ],
                       ),
 
@@ -881,10 +842,12 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                             onPressed: _isMeasuring
                                 ? null // 측정 중이면 버튼 비활성화(중복 루프 방지)
                                 : () async {
-                                    await _saveData('receive');
+                                    final sent = await _saveData('receive');
+                                    if (!sent) return;
 
                                     // Active ROM 모드에서 관절 선택 안 했으면 측정 시작하지 않음
-                                    if (_selectedMode == 'Active ROM' && _selectedPart == null) {
+                                    if (_selectedMode == 'Active ROM' &&
+                                        _selectedPart == null) {
                                       return; // 여기서 종료 → _isMeasuring = true 안 됨 → Progress도 안 뜸
                                     }
 
@@ -904,28 +867,13 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                                     //   _activeRom = true;
                                     // }
 
-                                    _btSubscription?.cancel();
-                                    _btSubscription = widget.bluetoothService.dataStream.listen((data) {
-                                      final s = data.trim();
-                                      print('[BT RX] "$s"');
-                                      final angle = double.tryParse(s);
-                                      if (angle == null) return;
-
-                                      if (_isMeasuring) {  // ★ 측정 중일 때만 UI 반영
-                                        final newMin = (_minAngle == null) ? angle : (angle < _minAngle! ? angle : _minAngle!);
-                                        final newMax = (_maxAngle == null) ? angle : (angle > _maxAngle! ? angle : _maxAngle!);
-
-                                        setState(() {
-                                          _currentAngle = angle;
-                                          _minAngle = newMin;
-                                          _maxAngle = newMax;
-                                        });
-                                      }
-                                    });
+                                    _listenToSelectedJoint();
                                   },
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                              textStyle: TextStyle(fontSize: 18 * fontSizeFactor),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 32, vertical: 16),
+                              textStyle:
+                                  TextStyle(fontSize: 18 * fontSizeFactor),
                             ),
                             child: Text(loc.receive),
                           ),
@@ -933,15 +881,16 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                           const SizedBox(width: 20), // 버튼 간 간격
                           ElevatedButton(
                             onPressed: () async {
-
-                              await _saveData('save');  // BT 종료 명령
+                              await _saveData('save'); // BT 종료 명령
 
                               _btSubscription?.cancel();
                               _btSubscription = null;
-                          
+
                               setState(() => _isMeasuring = false);
-                          
-                              _saveAngleData();  // 원래 쓰던 저장 함수 그대로
+
+                              // 임시 더미값(10.5°~135.0°) 저장 기능 비활성화.
+                              // 실제 측정값 저장 정책 확정 후 다시 연결합니다.
+                              // await _saveAngleData();
 
                               // if (_activeRom) {
                               //   widget.bluetoothService.sendBytes(
@@ -956,30 +905,26 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                               // _btSubscription?.cancel();
                               // _btSubscription = null;
 
-
                               // setState(() => _isMeasuring = false); // ★ 루프 종료 신호
 
                               // _saveData(); // _saveAngleData();
-
                             },
-
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                              textStyle: TextStyle(fontSize: 18 * fontSizeFactor),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 32, vertical: 16),
+                              textStyle:
+                                  TextStyle(fontSize: 18 * fontSizeFactor),
                             ),
                             child: Text(loc.save),
                           ),
                         ],
                       ),
-
                     ],
                   ],
-
                 ],
               ),
             ),
           ),
-
           Expanded(
             flex: 2,
             child: Center(
@@ -988,21 +933,20 @@ class _ROMModeSelectScreenState extends State<ROMModeSelectScreen> {
                 style: OutlinedButton.styleFrom(
                   shape: const CircleBorder(),
                   minimumSize: const Size(150, 150),
-                  backgroundColor: _selectedMode == 'Stop'
-                      ? Colors.red
-                      : null,
+                  backgroundColor: _selectedMode == 'Stop' ? Colors.red : null,
                   side: BorderSide(
                     color: _selectedMode == 'Stop' ? Colors.red : Colors.red,
                     width: 3,
                   ),
-                  foregroundColor: _selectedMode == 'Stop'
-                      ? Colors.white
-                      : Colors.black,
+                  foregroundColor:
+                      _selectedMode == 'Stop' ? Colors.white : Colors.black,
                 ),
                 child: Text(
-                  loc.stop, 
-                  style: TextStyle(fontSize: 30 * fontSizeFactor, fontWeight: FontWeight.bold),
-               ),
+                  loc.stop,
+                  style: TextStyle(
+                      fontSize: 30 * fontSizeFactor,
+                      fontWeight: FontWeight.bold),
+                ),
                 // child: const Icon(
                 //     Icons.pause,
                 //     size: 80,

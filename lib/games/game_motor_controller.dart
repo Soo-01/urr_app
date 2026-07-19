@@ -18,7 +18,8 @@ class GameMotorController {
 
   /// 모터 저항/속도 상한선 (하드코딩 안전 제한)
   static const double maxResistance = 5.0;
-  static const double maxCpmVelocity = 10.0;
+  static const double minCpmVelocity = 0.01;
+  static const double maxCpmVelocity = 0.10;
   static const double maxIsometricHoldTime = 10.0;
 
   GameMotorController({required this.bt});
@@ -36,11 +37,12 @@ class GameMotorController {
 
   // ─── 모터 모드 시작 ───
 
-  Future<bool> startCPM(double maxAngle, double minAngle, {double velocity = 3.0}) async {
-    velocity = velocity.clamp(1.0, maxCpmVelocity);
+  Future<bool> startCPM(double maxAngle, double minAngle,
+      {double velocity = 0.05}) async {
+    velocity = velocity.clamp(minCpmVelocity, maxCpmVelocity);
     _currentMode = 'cpm';
     _motorActive = true;
-    return _send('cpm,$maxAngle,$minAngle\n');
+    return _send('cpm,$minAngle,$maxAngle,$velocity\n');
   }
 
   Future<bool> startIsometric(double targetAngle, double holdTime) async {
@@ -50,11 +52,12 @@ class GameMotorController {
     return _send('isometric,$targetAngle,$holdTime\n');
   }
 
-  Future<bool> startIsotonic(double resistance) async {
+  Future<bool> startIsotonic(double resistance,
+      {double targetAngle = 0.0}) async {
     resistance = resistance.clamp(0.0, maxResistance);
     _currentMode = 'isotonic';
     _motorActive = true;
-    return _send('isotonic,$resistance\n');
+    return _send('isotonic,$targetAngle,$resistance\n');
   }
 
   // ─── 정지 ───
@@ -96,7 +99,8 @@ class GameMotorController {
         return;
       }
       if (_motorActive && _lastDataReceived != null) {
-        final elapsed = DateTime.now().difference(_lastDataReceived!).inMilliseconds;
+        final elapsed =
+            DateTime.now().difference(_lastDataReceived!).inMilliseconds;
         if (elapsed > watchdogTimeoutMs) {
           emergencyStop();
         }

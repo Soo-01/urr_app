@@ -2,16 +2,21 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:convert';  // 25.06.02 추가내용
-import 'dart:async';   // 25.06.02 추가내용
-
+import 'dart:convert'; // 25.06.02 추가내용
+import 'dart:async'; // 25.06.02 추가내용
+import 'robot_protocol.dart';
 
 class BluetoothService {
   static final BluetoothService _instance = BluetoothService._internal();
   factory BluetoothService() => _instance;
 
-  final StreamController<String> _dataController = StreamController<String>.broadcast();  // 25.06.02 추가내용
-  Stream<String> get dataStream => _dataController.stream;  // 25.06.02 추가내용
+  final StreamController<String> _dataController =
+      StreamController<String>.broadcast(); // 25.06.02 추가내용
+  Stream<String> get dataStream => _dataController.stream; // 25.06.02 추가내용
+  final StreamController<RobotTelemetryFrame> _telemetryController =
+      StreamController<RobotTelemetryFrame>.broadcast();
+  Stream<RobotTelemetryFrame> get telemetryStream =>
+      _telemetryController.stream;
 
   BluetoothService._internal();
 
@@ -23,7 +28,6 @@ class BluetoothService {
   String _buf = '';
   VoidCallback? _onDisconnectedCb;
 
-  
   Future<void> requestPermissions() async {
     final statuses = await [
       Permission.bluetooth,
@@ -42,7 +46,8 @@ class BluetoothService {
     return await _bluetooth.getBondedDevices();
   }
 
-  Future<void> connect(BluetoothDevice device, VoidCallback onDisconnected) async {
+  Future<void> connect(
+      BluetoothDevice device, VoidCallback onDisconnected) async {
     if (_connection != null && _connection!.isConnected) {
       await _connection!.close();
     }
@@ -84,20 +89,20 @@ class BluetoothService {
 
   // 25.06.02 추가내용
   Future<String?> receiveByte() async {
-  try {
-    if (_connection != null && _connection!.isConnected) {
-      // 데이터가 들어올 때까지 첫 패킷을 기다림
-      final data = await _connection!.input!.first;
-      final received = utf8.decode(data, allowMalformed: true).trim();
-      debugPrint('Data received from ${connectedDevice?.name}: $received');
-      return received;
-    } else {
-      throw Exception('Bluetooth not connected');
+    try {
+      if (_connection != null && _connection!.isConnected) {
+        // 데이터가 들어올 때까지 첫 패킷을 기다림
+        final data = await _connection!.input!.first;
+        final received = utf8.decode(data, allowMalformed: true).trim();
+        debugPrint('Data received from ${connectedDevice?.name}: $received');
+        return received;
+      } else {
+        throw Exception('Bluetooth not connected');
+      }
+    } catch (e) {
+      debugPrint("Receive failed: $e");
+      return null;
     }
-  } catch (e) {
-    debugPrint("Receive failed: $e");
-    return null;
-  }
   }
 
   Future<void> disconnect() async {
@@ -134,7 +139,11 @@ class BluetoothService {
           _buf = _buf.substring(idx + 1);
           if (line.isNotEmpty) {
             // debugPrint('[BluetoothService] line: $line');
-            _dataController.add(line);    // ← 앱의 dataStream 으로 전달 (예: "12.34")
+            _dataController.add(line); // ← 앱의 dataStream 으로 전달 (예: "12.34")
+            final telemetry = RobotTelemetryFrame.tryParse(line);
+            if (telemetry != null) {
+              _telemetryController.add(telemetry);
+            }
           }
         }
       },
@@ -142,7 +151,7 @@ class BluetoothService {
         debugPrint('Disconnected from ${connectedDevice?.name}');
         connectedDevice = null;
         _connection = null;
-        _onDisconnectedCb?.call();        // ← 화면 콜백 호출
+        _onDisconnectedCb?.call(); // ← 화면 콜백 호출
       },
       onError: (e, st) {
         debugPrint('BT input error: $e');
@@ -150,6 +159,4 @@ class BluetoothService {
       cancelOnError: false,
     );
   }
-
-
 }

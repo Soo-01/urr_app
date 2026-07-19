@@ -3,16 +3,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'generated/l10n.dart';
 
-
 // 1. 누적 저장을 위한 데이터 모델 정의
 class UserRecord {
   final DateTime timestamp;
-  final String userName;     // 사용자 식별을 위한 이름
-  final String recordType;   // 예: 'Passive ROM', 'Active ROM', 'CPM', 'Isometric', 'Isotonic'
-  final String joint;        // 예: '오른팔 어깨 굴곡/신전', '왼팔 손목 굴곡/신전'
+  final String userName; // 사용자 식별을 위한 이름
+  final String
+      recordType; // 예: 'Passive ROM', 'Active ROM', 'CPM', 'Isometric', 'Isotonic'
+  final String joint; // 예: '오른팔 어깨 굴곡/신전', '왼팔 손목 굴곡/신전'
   final double minAngle;
   final double maxAngle;
-  final String extraData;    // 속도, 저항력 단계, 지속시간 등 추가 정보 (선택 사항)
+  final String extraData; // 속도, 저항력 단계, 지속시간 등 추가 정보 (선택 사항)
 
   UserRecord({
     required this.timestamp,
@@ -51,6 +51,20 @@ class UserRecord {
 class RecordManager {
   static const String _storageKey = 'user_accumulated_records';
 
+  static Future<List<UserRecord>> loadRecords({String? userName}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final recordsJson = prefs.getString(_storageKey);
+    if (recordsJson == null) return [];
+
+    final decodedList = jsonDecode(recordsJson) as List<dynamic>;
+    final records = decodedList
+        .map((item) => UserRecord.fromJson(item as Map<String, dynamic>))
+        .where((record) => userName == null || record.userName == userName)
+        .toList();
+    records.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return records;
+  }
+
   // 새로운 기록을 기존 리스트에 누적하여 저장
   static Future<void> saveRecord(UserRecord newRecord) async {
     final prefs = await SharedPreferences.getInstance();
@@ -63,22 +77,58 @@ class RecordManager {
     }
 
     records.add(newRecord); // 새 기록 추가 (누적)
-    await prefs.setString(_storageKey, jsonEncode(records.map((r) => r.toJson()).toList()));
+    await prefs.setString(
+        _storageKey, jsonEncode(records.map((r) => r.toJson()).toList()));
+  }
+
+  /// Removes one persisted record. Timestamp and record contents are used as
+  /// an identity so existing records can be deleted without a storage migration.
+  static Future<bool> deleteRecord(UserRecord target) async {
+    final prefs = await SharedPreferences.getInstance();
+    final recordsJson = prefs.getString(_storageKey);
+    if (recordsJson == null) return false;
+
+    final decodedList = jsonDecode(recordsJson) as List<dynamic>;
+    final records = decodedList
+        .map((item) => UserRecord.fromJson(item as Map<String, dynamic>))
+        .toList();
+    final index = records.indexWhere((record) =>
+        record.timestamp == target.timestamp &&
+        record.userName == target.userName &&
+        record.recordType == target.recordType &&
+        record.joint == target.joint &&
+        record.minAngle == target.minAngle &&
+        record.maxAngle == target.maxAngle &&
+        record.extraData == target.extraData);
+    if (index == -1) return false;
+
+    records.removeAt(index);
+    if (records.isEmpty) {
+      await prefs.remove(_storageKey);
+    } else {
+      await prefs.setString(
+        _storageKey,
+        jsonEncode(records.map((record) => record.toJson()).toList()),
+      );
+    }
+    return true;
   }
 
   // 운동/게임을 위해 특정 사용자 & 특정 관절의 '가장 최근 ROM 측정값'만 가져오기
-  static Future<Map<String, double>?> getLatestROMLimit(String userName, String joint) async {
+  static Future<Map<String, double>?> getLatestROMLimit(
+      String userName, String joint) async {
     final prefs = await SharedPreferences.getInstance();
     final String? recordsJson = prefs.getString(_storageKey);
-    
+
     if (recordsJson == null) return null;
 
     final List<dynamic> decodedList = jsonDecode(recordsJson);
     List<UserRecord> records = decodedList
         .map((item) => UserRecord.fromJson(item))
-        .where((r) => r.userName == userName && 
-                      r.joint == joint && 
-                      r.recordType.contains('ROM')) // ROM 측정 기록만 필터링
+        .where((r) =>
+            r.userName == userName &&
+            r.joint == joint &&
+            r.recordType.contains('ROM')) // ROM 측정 기록만 필터링
         .toList();
 
     if (records.isEmpty) return null; // 해당 관절의 ROM 측정 기록이 없는 경우
@@ -102,16 +152,16 @@ class RecordScreen extends StatelessWidget {
   Future<List<UserRecord>> _fetchRecords() async {
     final prefs = await SharedPreferences.getInstance();
     final String? recordsJson = prefs.getString(RecordManager._storageKey);
-    
+
     if (recordsJson == null) return [];
 
     final List<dynamic> decodedList = jsonDecode(recordsJson);
     List<UserRecord> records = decodedList
         .map((item) => UserRecord.fromJson(item))
         // 💡 테스트 중이므로 현재 사용자 이름 필터링은 임시로 주석 처리합니다.
-        // .where((record) => record.userName == currentUser) 
+        // .where((record) => record.userName == currentUser)
         .toList();
-    
+
     // 최신 날짜순으로 정렬
     records.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return records;
@@ -136,7 +186,9 @@ class RecordScreen extends StatelessWidget {
 
           // 저장된 기록이 없을 때
           if (_userRecords.isEmpty) {
-            return Center(child: Text(loc.noSavedHistory, style: TextStyle(fontSize: 18)));
+            return Center(
+                child:
+                    Text(loc.noSavedHistory, style: TextStyle(fontSize: 18)));
           }
 
           // 기록이 있을 때 리스트 뷰로 출력
@@ -145,25 +197,33 @@ class RecordScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final record = _userRecords[index];
               // 날짜 포맷팅 (예: 2026-06-02 15:30)
-              final formattedDate = record.timestamp.toString().substring(0, 16);
+              final formattedDate =
+                  record.timestamp.toString().substring(0, 16);
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 elevation: 2,
                 child: ListTile(
                   leading: Icon(
-                    record.recordType.contains('ROM') ? Icons.straighten : Icons.fitness_center,
-                    color: record.recordType.contains('ROM') ? Colors.blue : Colors.orange,
+                    record.recordType.contains('ROM')
+                        ? Icons.straighten
+                        : Icons.fitness_center,
+                    color: record.recordType.contains('ROM')
+                        ? Colors.blue
+                        : Colors.orange,
                     size: 36,
                   ),
-                  title: Text('[${record.recordType}] ${record.joint}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text('[${record.recordType}] ${record.joint}',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
                       Text('${loc.date}: $formattedDate'),
-                      Text('${loc.range}: ${record.minAngle}° ~ ${record.maxAngle}°'),
-                      if (record.extraData.isNotEmpty) Text('${loc.details}: ${record.extraData}'),
+                      Text(
+                          '${loc.range}: ${record.minAngle}° ~ ${record.maxAngle}°'),
+                      if (record.extraData.isNotEmpty)
+                        Text('${loc.details}: ${record.extraData}'),
                     ],
                   ),
                   isThreeLine: true,

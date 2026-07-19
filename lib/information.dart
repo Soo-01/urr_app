@@ -1,102 +1,146 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart'; 
-import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'generated/l10n.dart';
 
-
-import 'record.dart'; 
+import 'record.dart';
 // ⚠️ 주의: UserProvider가 정의된 파일(주로 main.dart)을 알맞게 임포트 해주세요.
-import 'main.dart'; 
+import 'main.dart';
 
-class Information extends StatelessWidget {
+class Information extends StatefulWidget {
   // 💡 필요 없는 파라미터를 모두 지웠으므로 생성자도 텅 비워줍니다.
   const Information({super.key});
 
+  @override
+  State<Information> createState() => _InformationState();
+}
+
+class _InformationState extends State<Information> {
   Future<List<UserRecord>> _fetchUserRecords(String currentUserName) async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? recordsJson = prefs.getString('user_accumulated_records'); 
-    
-    if (recordsJson == null) return [];
-
-    final List<dynamic> decodedList = jsonDecode(recordsJson);
-    List<UserRecord> records = decodedList
-        .map((item) => UserRecord.fromJson(item))
-        .where((r) => r.userName == currentUserName) // ★ 현재 로그인된 이름과 일치하는 기록만 가져옴
-        .toList();
-
-    // 최신 날짜 순으로 정렬
-    records.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return records;
+    return RecordManager.loadRecords(userName: currentUserName);
   }
 
+  Future<void> _confirmAndDeleteRecord(UserRecord record) async {
+    final loc = AppLocalizations.of(context)!;
+    final isKorean = loc.localeName == 'ko';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isKorean ? '기록 삭제' : 'Delete record'),
+        content: Text(isKorean
+            ? '이 측정 및 운동 기록을 삭제하시겠습니까?'
+            : 'Delete this measurement or training record?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(isKorean ? '취소' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(isKorean ? '삭제' : 'Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final deleted = await RecordManager.deleteRecord(record);
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(deleted
+            ? (isKorean ? '기록이 삭제되었습니다.' : 'Record deleted.')
+            : (isKorean ? '기록을 찾을 수 없습니다.' : 'Record not found.')),
+      ),
+    );
+  }
 
   // 예시: 파일 상단 또는 클래스 내부에 작성
-String getLocalizedGender(String gender, AppLocalizations loc) {
-  switch (gender) {
-    case 'Male': return loc.male;
-    case 'Female': return loc.female;
-    default: return gender; // 매핑되지 않은 경우 원본 텍스트 반환
+  String getLocalizedGender(String gender, AppLocalizations loc) {
+    switch (gender) {
+      case 'Male':
+        return loc.male;
+      case 'Female':
+        return loc.female;
+      default:
+        return gender; // 매핑되지 않은 경우 원본 텍스트 반환
+    }
   }
-}
 
-String getLocalizedArm(String arm, AppLocalizations loc) {
-  switch (arm) {
-    case 'Right': return loc.right;
-    case 'Left': return loc.left;
-    default: return arm;
+  String getLocalizedArm(String arm, AppLocalizations loc) {
+    switch (arm) {
+      case 'Right':
+        return loc.right;
+      case 'Left':
+        return loc.left;
+      default:
+        return arm;
+    }
   }
-}
 
-String getLocalizedMode(String mode, AppLocalizations loc) {
-  switch (mode) {
-    case 'Passive ROM': return loc.passiverom;
-    case 'Active ROM': return loc.activerom;
-    case 'CPM': return loc.cpm;
-    case 'Isometric': return loc.isometric;
-    case 'Isotonic': return loc.isotonic;
+  String getLocalizedMode(String mode, AppLocalizations loc) {
+    switch (mode) {
+      case 'Passive ROM':
+        return loc.passiverom;
+      case 'Active ROM':
+        return loc.activerom;
+      case 'CPM':
+        return loc.cpm;
+      case 'Isometric':
+        return loc.isometric;
+      case 'Isotonic':
+        return loc.isotonic;
 
-    // case 'lShoulderEF': return loc.lShoulderEF;
-    // case 'lShoulderRo': return loc.lShoulderRo;
-    // case 'lElbow': return loc.lElbow;
-    // case 'lWrist': return loc.lWrist;
+      // case 'lShoulderEF': return loc.lShoulderEF;
+      // case 'lShoulderRo': return loc.lShoulderRo;
+      // case 'lElbow': return loc.lElbow;
+      // case 'lWrist': return loc.lWrist;
 
-    // case 'rShoulderEF': return loc.rShoulderEF;
-    // case 'rShoulderRo': return loc.rShoulderRo;
-    // case 'rElbow': return loc.rElbow;
-    // case 'rWrist': return loc.rWrist;    
+      // case 'rShoulderEF': return loc.rShoulderEF;
+      // case 'rShoulderRo': return loc.rShoulderRo;
+      // case 'rElbow': return loc.rElbow;
+      // case 'rWrist': return loc.rWrist;
 
-    default: return mode;
+      default:
+        return mode;
+    }
   }
-}
 
-String getLocalizedJoint(String joint, AppLocalizations loc) {
-  switch (joint) {
-    case 'lShoulderEF': return loc.lShoulderEF;
-    case 'lShoulderRo': return loc.lShoulderRo;
-    case 'lElbow': return loc.lElbow;
-    case 'lWrist': return loc.lWrist;
+  String getLocalizedJoint(String joint, AppLocalizations loc) {
+    switch (joint) {
+      case 'lShoulderEF':
+        return loc.lShoulderEF;
+      case 'lShoulderRo':
+        return loc.lShoulderRo;
+      case 'lElbow':
+        return loc.lElbow;
+      case 'lWrist':
+        return loc.lWrist;
 
-    case 'rShoulderEF': return loc.rShoulderEF;
-    case 'rShoulderRo': return loc.rShoulderRo;
-    case 'rElbow': return loc.rElbow;
-    case 'rWrist': return loc.rWrist;  
-    default: return joint; // 일치하는 게 없으면 원본 반환
+      case 'rShoulderEF':
+        return loc.rShoulderEF;
+      case 'rShoulderRo':
+        return loc.rShoulderRo;
+      case 'rElbow':
+        return loc.rElbow;
+      case 'rWrist':
+        return loc.rWrist;
+      default:
+        return joint; // 일치하는 게 없으면 원본 반환
+    }
   }
-}
 
-
-String getLocalizedExtraData(String extraData, AppLocalizations loc) {
-  // 저장된 문자열 내부의 영어 라벨들을 한글 라벨로 교체합니다.
-  return extraData
-      .replaceAll('Velocity:', '속도:')
-      .replaceAll('Intensity:', '저항력:')
-      .replaceAll('Target Angle:', '목표 각도:')
-      .replaceAll('Duration:', '지속 시간:')
-      .replaceAll('SubMode:', '모드:')
-      .replaceAll('Cable', '케이블')
-      .replaceAll('Dumbbell', '덤벨');
-}
+  String getLocalizedExtraData(String extraData, AppLocalizations loc) {
+    // 저장된 문자열 내부의 영어 라벨들을 한글 라벨로 교체합니다.
+    return extraData
+        .replaceAll('Velocity:', '속도:')
+        .replaceAll('Intensity:', '저항력:')
+        .replaceAll('Target Angle:', '목표 각도:')
+        .replaceAll('Duration:', '지속 시간:')
+        .replaceAll('SubMode:', '모드:')
+        .replaceAll('Cable', '케이블')
+        .replaceAll('Dumbbell', '덤벨');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -104,12 +148,12 @@ String getLocalizedExtraData(String extraData, AppLocalizations loc) {
 
     // Provider에서 현재 사용자 정보를 바로 가져옵니다.
     final userProvider = Provider.of<UserProvider>(context);
-    final String name = userProvider.name ?? 'Unknown';
-    final String gender = userProvider.gender ?? 'Unknown';
-    final double age = userProvider.age?.toDouble() ?? 0.0;
-    final double height = userProvider.height?.toDouble() ?? 0.0;
-    final double weight = userProvider.weight?.toDouble() ?? 0.0;
-    final String arm = userProvider.arm ?? 'Unknown';
+    final String name = userProvider.name;
+    final String gender = userProvider.gender;
+    final double age = userProvider.age.toDouble();
+    final double height = userProvider.height.toDouble();
+    final double weight = userProvider.weight.toDouble();
+    final String arm = userProvider.arm;
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.userProfileAndHistory)),
@@ -120,7 +164,9 @@ String getLocalizedExtraData(String extraData, AppLocalizations loc) {
             // ==========================================
             // 1. 제일 위에는 현재 로드되어있는 사용자 정보 띄우기
             // ==========================================
-            Text('👤 ${loc.profile}:', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('👤 ${loc.profile}:',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text('${loc.name}: $name'),
             // Text('${loc.gender}: $gender'),
@@ -136,9 +182,11 @@ String getLocalizedExtraData(String extraData, AppLocalizations loc) {
             // ==========================================
             // 3. Saved Measurement & Training History만 남기기
             // ==========================================
-            Text('📊 ${loc.savedMeasurementAndTrainigHistory}:', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('📊 ${loc.savedMeasurementAndTrainigHistory}:',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            
+
             FutureBuilder<List<UserRecord>>(
               future: _fetchUserRecords(name), // ★ 현재 사용자 이름으로 데이터 조회
               builder: (context, snapshot) {
@@ -152,14 +200,17 @@ String getLocalizedExtraData(String extraData, AppLocalizations loc) {
                 if (records.isEmpty) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    child: Text(loc.noSavedHistory, style: const TextStyle(color: Colors.grey, fontSize: 16)),
+                    child: Text(loc.noSavedHistory,
+                        style:
+                            const TextStyle(color: Colors.grey, fontSize: 16)),
                   );
                 }
 
                 // 기록이 있을 때 출력 (Selected Mode Settings로 띄우던 정보는 extraData에 저장되어 Details: 로 출력됨)
                 return Column(
                   children: records.map((record) {
-                    final formattedDate = record.timestamp.toString().substring(0, 16);
+                    final formattedDate =
+                        record.timestamp.toString().substring(0, 16);
 
                     // return Card(
                     //   margin: const EdgeInsets.symmetric(vertical: 6),
@@ -180,23 +231,53 @@ String getLocalizedExtraData(String extraData, AppLocalizations loc) {
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 6),
                       elevation: 2,
-                      child: ListTile(
-                        leading: Icon(
-                          record.recordType.contains('ROM') ? Icons.straighten : Icons.fitness_center,
-                          color: record.recordType.contains('ROM') ? Colors.blue : Colors.orange,
-                          size: 32,
-                        ),
-                        // 1️⃣ title 부분 수정: Mode(기록 타입)와 Joint(관절 부위)를 한글로 변환
-                        title: Text(
-                          '[${getLocalizedMode(record.recordType, loc)}] ${getLocalizedJoint(record.joint, loc)}', 
-                          style: const TextStyle(fontWeight: FontWeight.bold)
-                        ),
-                        // 2️⃣ subtitle 부분 수정: extraData 내부의 영문 정보(Velocity, Intensity 등)를 한글로 변환
-                        subtitle: Text(
-                          '${loc.data}: $formattedDate\n${loc.range}: ${record.minAngle}° ~ ${record.maxAngle}°' +
-                          (record.extraData.isNotEmpty ? '\n${loc.details}: ${getLocalizedExtraData(record.extraData, loc)}' : '')
-                        ),
-                        isThreeLine: true,
+                      child: Stack(
+                        children: [
+                          ListTile(
+                            contentPadding:
+                                const EdgeInsets.fromLTRB(16, 8, 48, 8),
+                            leading: Icon(
+                              record.recordType.contains('ROM')
+                                  ? Icons.straighten
+                                  : Icons.fitness_center,
+                              color: record.recordType.contains('ROM')
+                                  ? Colors.blue
+                                  : Colors.orange,
+                              size: 32,
+                            ),
+                            title: Text(
+                              '[${getLocalizedMode(record.recordType, loc)}] ${getLocalizedJoint(record.joint, loc)}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text(
+                              '${loc.data}: $formattedDate\n${loc.range}: ${record.minAngle}° ~ ${record.maxAngle}°' +
+                                  (record.extraData.isNotEmpty
+                                      ? '\n${loc.details}: ${getLocalizedExtraData(record.extraData, loc)}'
+                                      : ''),
+                            ),
+                            isThreeLine: true,
+                          ),
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: IconButton(
+                              visualDensity: VisualDensity.compact,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              padding: EdgeInsets.zero,
+                              iconSize: 18,
+                              color: Colors.red.shade400,
+                              tooltip: loc.localeName == 'ko'
+                                  ? '기록 삭제'
+                                  : 'Delete record',
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => _confirmAndDeleteRecord(record),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }).toList(),
