@@ -37,8 +37,18 @@ class _BottomNavBarState extends State<BottomNavBar> {
   List<FileSystemEntity> _uploadedFiles = [];
   final List<FileSystemEntity> _sendedFiles = [];
   String _selectedMode = 'Stop';
-  final Map<String, String> _velocityController = {'Sit': '', 'Stand': '', 'Walk': '', 'Stop': ''};
-  final Map<String, String> _intensityController = {'Sit': '', 'Stand': '', 'Walk': '', 'Stop': ''};
+  final Map<String, String> _velocityController = {
+    'Sit': '',
+    'Stand': '',
+    'Walk': '',
+    'Stop': ''
+  };
+  final Map<String, String> _intensityController = {
+    'Sit': '',
+    'Stand': '',
+    'Walk': '',
+    'Stop': ''
+  };
   final Map<String, Map<String, double>> _controlValues = {};
 
   @override
@@ -81,7 +91,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    loc.enterPasswordInstruction, 
+                    loc.enterPasswordInstruction,
                     style: const TextStyle(fontSize: 16),
                   ),
                   const SizedBox(height: 20),
@@ -126,6 +136,35 @@ class _BottomNavBarState extends State<BottomNavBar> {
   }
 
   void _onItemTapped(int index) async {
+    final userProvider = context.read<UserProvider>();
+    final requiresProfile = index == 2 || index == 3 || index == 5;
+    final requiresRom = index == 3 || index == 5;
+    final isKorean =
+        AppLocalizations.of(context)!.localeName.toLowerCase().startsWith('ko');
+
+    if (requiresProfile && !userProvider.hasRegisteredProfile) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isKorean
+              ? '먼저 프로필을 등록하거나 저장된 프로필을 불러와 주세요.'
+              : 'Register or load a profile first.'),
+        ),
+      );
+      setState(() => _selectedIndex = 1);
+      return;
+    }
+    if (requiresRom && !userProvider.hasAnyRomMeasurement) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isKorean
+              ? '운동이나 게임을 시작하기 전에 PROM 또는 AROM을 측정해 주세요.'
+              : 'Measure either PROM or AROM before exercise or games.'),
+        ),
+      );
+      setState(() => _selectedIndex = 2);
+      return;
+    }
+
     if (index == 6) {
       final success = await _showPasswordDialog();
       if (!success) {
@@ -138,15 +177,16 @@ class _BottomNavBarState extends State<BottomNavBar> {
     });
   }
 
-    void updateChangedFiles(List<FileSystemEntity> files) {
-      setState(() {
-        _uploadedFiles = files;
+  void updateChangedFiles(List<FileSystemEntity> files) {
+    setState(() {
+      _uploadedFiles = files;
     });
   }
 
   void updateSendedFiles(FileSystemEntity file) {
     setState(() {
-      _sendedFiles.removeWhere((f) => f.path.split('/').last == file.path.split('/').last);
+      _sendedFiles.removeWhere(
+          (f) => f.path.split('/').last == file.path.split('/').last);
       _sendedFiles.add(file);
     });
   }
@@ -176,8 +216,8 @@ class _BottomNavBarState extends State<BottomNavBar> {
 
     final pages = [
       HomeScreen(bluetoothService: _bluetoothService),
-      
-      // 1. ProfileScreen 수정: 모든 파라미터를 지웁니다. 
+
+      // 1. ProfileScreen 수정: 모든 파라미터를 지웁니다.
       // (데이터는 ProfileScreen 내부에서 UserProvider를 통해 직접 처리함)
       const ProfileScreen(),
 
@@ -194,7 +234,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
       //   },
       //   userList: [], // (선택 사항) 저장된 사용자 리스트 전달
       // ),
-    
+
       ROMModeSelectScreen(
         bluetoothService: _bluetoothService,
         onModeChanged: updateModeSettings,
@@ -222,7 +262,8 @@ class _BottomNavBarState extends State<BottomNavBar> {
           );
         },
       ),
-      GameHubScreen(                                   // 4
+      GameHubScreen(
+        // 4
         bluetoothService: _bluetoothService,
       ),
       FileUploadScreen(
@@ -230,7 +271,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
         onFilesChanged: updateChangedFiles,
         onFilesSent: updateSendedFiles,
       ),
-    
+
       // 2. Information 수정: 개인정보(name, age 등) 파라미터를 모두 지웁니다.
       // (이 정보 역시 Information 내부에서 Provider로 가져옴)
       // Information(
@@ -258,20 +299,38 @@ class _BottomNavBarState extends State<BottomNavBar> {
                       onDestinationSelected: _onItemTapped,
                       labelType: NavigationRailLabelType.selected,
                       destinations: [
-                        NavigationRailDestination(icon: const Icon(Icons.home), label: Text(loc.home)),
-                        NavigationRailDestination(icon: const Icon(Icons.person), label: Text(loc.profile)),
-                        NavigationRailDestination(icon: const Icon(Icons.straighten), label: Text(loc.romMode)),
-                        NavigationRailDestination(icon: const Icon(Icons.fitness_center), label: Text(loc.modeSelect)),
-                        NavigationRailDestination(icon: const Icon(Icons.settings), label: Text(loc.control)),
-                        NavigationRailDestination(icon: const Icon(Icons.sports_esports), label: Text(loc.game)),
-                        NavigationRailDestination(icon: const Icon(Icons.file_upload), label: Text(loc.fileUpload)),
-                        NavigationRailDestination(icon: const Icon(Icons.history), label: Text(loc.history)),
+                        NavigationRailDestination(
+                            icon: const Icon(Icons.home),
+                            label: Text(loc.home)),
+                        NavigationRailDestination(
+                            icon: const Icon(Icons.person),
+                            label: Text(loc.profile)),
+                        NavigationRailDestination(
+                            icon: const Icon(Icons.straighten),
+                            label: Text(loc.romMode)),
+                        NavigationRailDestination(
+                            icon: const Icon(Icons.fitness_center),
+                            label: Text(loc.modeSelect)),
+                        NavigationRailDestination(
+                            icon: const Icon(Icons.settings),
+                            label: Text(loc.control)),
+                        NavigationRailDestination(
+                            icon: const Icon(Icons.sports_esports),
+                            label: Text(loc.game)),
+                        NavigationRailDestination(
+                            icon: const Icon(Icons.file_upload),
+                            label: Text(loc.fileUpload)),
+                        NavigationRailDestination(
+                            icon: const Icon(Icons.history),
+                            label: Text(loc.history)),
                       ],
                     ),
-                  Expanded(child: IndexedStack(index: _selectedIndex, children: pages)),
+                  Expanded(
+                      child:
+                          IndexedStack(index: _selectedIndex, children: pages)),
                 ],
               ),
-              
+
               // 2. 글자 크기 조절 버튼 (Stack 안이므로 Positioned 사용 가능)
               Positioned(
                 right: 20,
@@ -282,8 +341,10 @@ class _BottomNavBarState extends State<BottomNavBar> {
                     FloatingActionButton.small(
                       heroTag: "inc_font",
                       onPressed: () {
-                        final provider = Provider.of<FontSizeProvider>(context, listen: false);
-                        provider.setScaleFactor((provider.scaleFactor + 0.1).clamp(1.0, 2.0));
+                        final provider = Provider.of<FontSizeProvider>(context,
+                            listen: false);
+                        provider.setScaleFactor(
+                            (provider.scaleFactor + 0.1).clamp(1.0, 2.0));
                       },
                       child: const Icon(Icons.add),
                     ),
@@ -291,8 +352,10 @@ class _BottomNavBarState extends State<BottomNavBar> {
                     FloatingActionButton.small(
                       heroTag: "dec_font",
                       onPressed: () {
-                        final provider = Provider.of<FontSizeProvider>(context, listen: false);
-                        provider.setScaleFactor((provider.scaleFactor - 0.1).clamp(1.0, 2.0));
+                        final provider = Provider.of<FontSizeProvider>(context,
+                            listen: false);
+                        provider.setScaleFactor(
+                            (provider.scaleFactor - 0.1).clamp(1.0, 2.0));
                       },
                       child: const Icon(Icons.remove),
                     ),
@@ -310,18 +373,28 @@ class _BottomNavBarState extends State<BottomNavBar> {
                 currentIndex: _selectedIndex,
                 onTap: _onItemTapped,
                 items: [
-                  BottomNavigationBarItem(icon: const Icon(Icons.home), label: loc.home),
-                  BottomNavigationBarItem(icon: const Icon(Icons.person), label: loc.profile),
-                  BottomNavigationBarItem(icon: const Icon(Icons.straighten), label: loc.romMode),
-                  BottomNavigationBarItem(icon: const Icon(Icons.fitness_center), label: loc.modeSelect),
-                  BottomNavigationBarItem(icon: const Icon(Icons.settings), label: loc.control),
-                  BottomNavigationBarItem(icon: const Icon(Icons.sports_esports), label: loc.game),
-                  BottomNavigationBarItem(icon: const Icon(Icons.file_upload), label: loc.fileUpload),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.home), label: loc.home),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.person), label: loc.profile),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.straighten), label: loc.romMode),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.fitness_center),
+                      label: loc.modeSelect),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.settings), label: loc.control),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.sports_esports), label: loc.game),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.file_upload),
+                      label: loc.fileUpload),
                   // BottomNavigationBarItem(icon: const Icon(Icons.star), label: loc.information),
-                  BottomNavigationBarItem(icon: const Icon(Icons.history), label: loc.history),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.history), label: loc.history),
                 ],
               ),
-        ),
-      );
-    }
+      ),
+    );
   }
+}

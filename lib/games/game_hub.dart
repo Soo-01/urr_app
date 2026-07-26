@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../bluetooth.dart';
 import '../generated/l10n.dart';
+import '../main.dart';
+import '../joint_options.dart';
 import 'game_base.dart';
 import 'angle_normalizer.dart';
 import 'games/target_reaching_game.dart';
@@ -237,12 +240,77 @@ class _GameSetupScreenState extends State<_GameSetupScreen> {
   CognitiveLevel _cognitive = CognitiveLevel.rich;
   String? _neglect;
   late String _joint;
+  final TextEditingController _romMinController = TextEditingController();
+  final TextEditingController _romMaxController = TextEditingController();
+  bool _romInitialized = false;
+  String? _selectedRomMode;
+  String? _savedRomSummary;
 
   @override
   void initState() {
     super.initState();
-    _joint = widget.defaultJoint;
+    final defaultJoint = widget.defaultJoint.split('+').first;
+    _joint = rehabilitationJointCodes.contains(defaultJoint)
+        ? defaultJoint
+        : 'rShoulderEF';
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_romInitialized && widget.gameId == 'shield_guard') {
+      _romInitialized = true;
+      _loadRomForSelectedJoint(rebuild: false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _romMinController.dispose();
+    _romMaxController.dispose();
+    super.dispose();
+  }
+
+  void _loadRomForSelectedJoint({bool rebuild = true}) {
+    final userProvider = context.read<UserProvider>();
+    final prom = userProvider.promForPart(_joint);
+    final arom = userProvider.aromForPart(_joint);
+    final selected = userProvider.measuredRomForPart(_joint);
+
+    void apply() {
+      if (selected == null) {
+        _romMinController.clear();
+        _romMaxController.clear();
+        _selectedRomMode = null;
+      } else {
+        _romMinController.text =
+            (selected['minAngle'] as num).toDouble().toStringAsFixed(1);
+        _romMaxController.text =
+            (selected['maxAngle'] as num).toDouble().toStringAsFixed(1);
+        _selectedRomMode = selected['mode']?.toString();
+      }
+      final summaries = <String>[
+        if (prom != null) 'PROM ${_formatRomRange(prom)}',
+        if (arom != null) 'AROM ${_formatRomRange(arom)}',
+      ];
+      _savedRomSummary = summaries.isEmpty ? null : summaries.join(' / ');
+    }
+
+    if (rebuild) {
+      setState(apply);
+    } else {
+      apply();
+    }
+  }
+
+  String _formatRomRange(Map<String, dynamic> rom) {
+    final min = (rom['minAngle'] as num).toDouble();
+    final max = (rom['maxAngle'] as num).toDouble();
+    return '${min.toStringAsFixed(1)}° ~ ${max.toStringAsFixed(1)}°';
+  }
+
+  bool isKoreanLocale(AppLocalizations loc) =>
+      loc.localeName.toLowerCase().startsWith('ko');
 
   @override
   Widget build(BuildContext context) {
@@ -269,6 +337,91 @@ class _GameSetupScreenState extends State<_GameSetupScreen> {
 
           const SizedBox(height: 20),
           // 인지 레벨
+          Text(loc.selectPart,
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: _joint,
+            items: rehabilitationJointCodes
+                .map((code) => DropdownMenuItem(
+                      value: code,
+                      child: Text(localizedJointLabel(code, loc)),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _joint = value);
+                if (widget.gameId == 'shield_guard') {
+                  _loadRomForSelectedJoint();
+                }
+              }
+            },
+          ),
+          const SizedBox(height: 20),
+          if (widget.gameId == 'shield_guard') ...[
+            Text(
+              isKoreanLocale(loc) ? '게임 적용 가동 범위' : 'Game ROM range',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            if (_savedRomSummary != null)
+              Text(
+                '${isKoreanLocale(loc) ? '저장된 ROM' : 'Saved ROM'}: '
+                '$_savedRomSummary\n'
+                '${isKoreanLocale(loc) ? '자동 선택' : 'Auto selected'}: '
+                '${_selectedRomMode ?? '-'}',
+              ),
+            if (_savedRomSummary == null)
+              Text(
+                isKoreanLocale(loc)
+                    ? '선택한 관절에 저장된 PROM/AROM이 없습니다.'
+                    : 'No saved PROM/AROM for the selected joint.',
+                style: const TextStyle(color: Colors.red),
+              ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _romMinController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText:
+                          isKoreanLocale(loc) ? '최소 각도 (°)' : 'Min angle (°)',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _romMaxController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText:
+                          isKoreanLocale(loc) ? '최대 각도 (°)' : 'Max angle (°)',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isKoreanLocale(loc)
+                  ? 'PROM과 AROM 중 더 좁은 범위를 자동 적용합니다. 위 값은 이번 게임에 맞게 수정할 수 있습니다.'
+                  : 'The narrower PROM/AROM is selected automatically. You can edit it for this game.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 20),
+          ],
           Text(loc.cognitiveLevel,
               style:
                   const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -352,8 +505,69 @@ class _GameSetupScreenState extends State<_GameSetupScreen> {
   }
 
   void _startGame() {
+    final userProvider = context.read<UserProvider>();
+    final isKorean =
+        AppLocalizations.of(context)!.localeName.toLowerCase().startsWith('ko');
+    if (!userProvider.hasRegisteredProfile) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isKorean
+              ? '게임을 시작하기 전에 프로필을 등록하거나 불러와 주세요.'
+              : 'Register or load a profile before starting a game.'),
+        ),
+      );
+      return;
+    }
+    if (!userProvider.hasAnyRomMeasurement) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isKorean
+              ? '게임을 시작하기 전에 PROM 또는 AROM을 측정해 주세요.'
+              : 'Measure either PROM or AROM before starting a game.'),
+        ),
+      );
+      return;
+    }
+
+    final measuredRom = userProvider.measuredRomForPart(_joint);
+    if (widget.gameId == 'shield_guard' && measuredRom == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isKorean
+              ? '방패 수비대에 사용할 관절의 PROM 또는 AROM을 먼저 측정해 주세요.'
+              : 'Measure PROM or AROM for the selected Shield Guard joint first.'),
+        ),
+      );
+      return;
+    }
+    late final AngleNormalizer normalizer;
+    if (widget.gameId == 'shield_guard') {
+      final minAngle = double.tryParse(_romMinController.text.trim());
+      final maxAngle = double.tryParse(_romMaxController.text.trim());
+      if (minAngle == null ||
+          maxAngle == null ||
+          !minAngle.isFinite ||
+          !maxAngle.isFinite ||
+          minAngle >= maxAngle) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isKorean
+                ? '가동 범위의 최소 각도와 최대 각도를 올바르게 입력해 주세요.'
+                : 'Enter a valid ROM range with min angle below max angle.'),
+          ),
+        );
+        return;
+      }
+      normalizer = AngleNormalizer(
+        minAngle: minAngle,
+        maxAngle: maxAngle,
+      );
+    } else {
+      normalizer = const AngleNormalizer(minAngle: -100, maxAngle: 100);
+    }
+
     final config = GameConfig(
-      normalizer: const AngleNormalizer(minAngle: -100, maxAngle: 100),
+      normalizer: normalizer,
       difficultyLevel: _difficulty,
       bodyPart: _joint.contains('+') ? _joint.split('+').first : _joint,
       gameDuration: Duration(seconds: _duration),

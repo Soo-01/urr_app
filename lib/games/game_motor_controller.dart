@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import '../bluetooth.dart';
+import '../robot_protocol.dart';
 
 /// 게임↔모터 브리지 클래스.
 /// 게임에서 모터 명령을 안전하게 전송하고, BT 연결 상태를 감시한다.
@@ -42,14 +43,23 @@ class GameMotorController {
     velocity = velocity.clamp(minCpmVelocity, maxCpmVelocity);
     _currentMode = 'cpm';
     _motorActive = true;
-    return _send('cpm,$minAngle,$maxAngle,$velocity\n');
+    return _send('${RobotProtocol.cpmForPart(
+      partCode: _currentJoint,
+      minDegrees: minAngle,
+      maxDegrees: maxAngle,
+      speedRadPerSec: velocity,
+    )}\n');
   }
 
   Future<bool> startIsometric(double targetAngle, double holdTime) async {
     holdTime = holdTime.clamp(1.0, maxIsometricHoldTime);
     _currentMode = 'isometric';
     _motorActive = true;
-    return _send('isometric,$targetAngle,$holdTime\n');
+    return _send('${RobotProtocol.isometricForPart(
+      partCode: _currentJoint,
+      targetDegrees: targetAngle,
+      holdSeconds: holdTime,
+    )}\n');
   }
 
   Future<bool> startIsotonic(double resistance,
@@ -57,7 +67,17 @@ class GameMotorController {
     resistance = resistance.clamp(0.0, maxResistance);
     _currentMode = 'isotonic';
     _motorActive = true;
-    return _send('isotonic,$targetAngle,$resistance\n');
+    return _send('${RobotProtocol.isotonicForPart(
+      partCode: _currentJoint,
+      targetDegrees: targetAngle,
+      resistanceKg: resistance,
+    )}\n');
+  }
+
+  Future<bool> startArom() async {
+    _currentMode = 'arom';
+    _motorActive = true;
+    return _send('${RobotProtocol.arom}\n');
   }
 
   // ─── 정지 ───
@@ -121,10 +141,11 @@ class GameMotorController {
   // ─── 각도 스트림 (정규화 전 raw) ───
 
   /// 게임용 raw 각도 스트림 (String → double)
-  Stream<double> get angleStream => bt.dataStream
-      .map((s) => double.tryParse(s.trim()))
-      .where((v) => v != null)
-      .cast<double>();
+  Stream<double> get angleStream => bt.telemetryStream
+      .map((frame) => frame.jointForPart(_currentJoint))
+      .where((joint) => joint != null && joint.online)
+      .map((joint) =>
+          RobotProtocol.toUiDegrees(_currentJoint, joint!.positionDegrees));
 
   // ─── 내부 ───
 

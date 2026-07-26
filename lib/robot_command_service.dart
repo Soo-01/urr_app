@@ -14,6 +14,16 @@ class RobotCommandService {
 
   Future<bool> send(String command) async {
     if (!_bluetooth.isConnected()) {
+      if (_bluetooth.usesDevelopmentDummyData) {
+        final normalized =
+            command.replaceAll('\r', '').replaceAll('\n', '').trim();
+        debugPrint('[DEV DUMMY TX] accepted: $normalized');
+        if (normalized == RobotProtocol.stop ||
+            normalized == RobotProtocol.isometricStop) {
+          _bluetooth.stopDevelopmentDummyTelemetry();
+        }
+        return normalized.isNotEmpty;
+      }
       debugPrint('[ROBOT TX] skipped (Bluetooth disconnected): $command');
       return false;
     }
@@ -32,6 +42,9 @@ class RobotCommandService {
   /// Re-sends PART immediately before a motion command so the Jetson node
   /// cannot accidentally apply the command to a previously selected joint.
   Future<bool> sendForPart(String partCode, String command) async {
+    if (_bluetooth.usesDevelopmentDummyData) {
+      _bluetooth.startDevelopmentDummyTelemetry(partCode);
+    }
     final partSuccess = await selectPart(partCode);
     if (!partSuccess) {
       debugPrint('[ROBOT TX] skipped (PART failed): $command');
@@ -41,5 +54,11 @@ class RobotCommandService {
     return send(command);
   }
 
-  Future<bool> stop() => send(RobotProtocol.stop);
+  Future<bool> stop() async {
+    final success = await send(RobotProtocol.stop);
+    if (_bluetooth.usesDevelopmentDummyData) {
+      _bluetooth.stopDevelopmentDummyTelemetry();
+    }
+    return success;
+  }
 }

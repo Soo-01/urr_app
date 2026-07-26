@@ -9,13 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../bluetooth.dart';
 import '../../generated/l10n.dart';
+import '../../robot_protocol.dart';
 import '../game_base.dart';
 import '../game_motor_controller.dart';
 import '../game_result_screen.dart';
-
-import 'dart:typed_data';
-import 'dart:convert';  // utf8.encode 사용을 위해 추가
-
 
 // ============================================================================
 // [S3] 방패 막기 (Shield Guard)
@@ -29,9 +26,9 @@ enum _ArrowPhase { flying, holding, done }
 
 class _ArrowData {
   double x;
-  final double y;       // 화살 고정 Y (목표 높이)
+  final double y; // 화살 고정 Y (목표 높이)
   final double speed;
-  final bool isDown;    // true = ↓ 굽힘저항, false = ↑ 폄저항
+  final bool isDown; // true = ↓ 굽힘저항, false = ↑ 폄저항
   _ArrowPhase phase;
   bool hitSoundPlayed = false; // 타격음 선재생 플래그
 
@@ -52,9 +49,12 @@ class _Particle {
   final double radius;
 
   _Particle({
-    required this.x, required this.y,
-    required this.vx, required this.vy,
-    required this.color, required this.radius,
+    required this.x,
+    required this.y,
+    required this.vx,
+    required this.vy,
+    required this.color,
+    required this.radius,
   });
 }
 
@@ -64,6 +64,7 @@ class ShieldGuardFlameGame extends FlameGame {
   final Stream<double>? inputStream;
   final GameConfig config;
   final void Function(GameResult) onGameEnd;
+  final bool startPaused;
 
   StreamSubscription<double>? _sub;
   double currentPosition = 0.5;
@@ -96,7 +97,10 @@ class ShieldGuardFlameGame extends FlameGame {
 
   // 막은 화살 수 / 클리어 목표
   int _blockedCount = 0;
+  int _failedCount = 0;
   late int _clearTarget; // 난이도별 클리어 목표
+  double _elapsedSeconds = 0;
+  bool _hasEnded = false;
 
   // 파티클
   final List<_Particle> _particles = [];
@@ -117,16 +121,26 @@ class ShieldGuardFlameGame extends FlameGame {
   late final TextPaint _tpHoldHint;
 
   // 캐싱된 Paint (매 프레임 생성 방지)
-  final Paint _paintPlain     = Paint();
-  final Paint _paintShadow    = Paint()..colorFilter = const ColorFilter.mode(Colors.black54, BlendMode.srcIn);
+  final Paint _paintPlain = Paint();
+  final Paint _paintShadow = Paint()
+    ..colorFilter = const ColorFilter.mode(Colors.black54, BlendMode.srcIn);
   final Paint _paintIndicator = Paint()..blendMode = BlendMode.plus;
-  final Paint _paintRingBg    = Paint()..color = Colors.white12 ..style = PaintingStyle.stroke ..strokeWidth = 10;
-  final Paint _paintRingFg    = Paint()..color = Colors.cyanAccent ..style = PaintingStyle.stroke ..strokeWidth = 10 ..strokeCap = StrokeCap.round;
-  final Paint _paintGlow      = Paint()..blendMode = BlendMode.plus;
-  final Paint _paintFlash     = Paint();
-  final Paint _paintIndBg     = Paint()..color = Colors.black.withValues(alpha: 0.6);
-  final Paint _paintLifeOn    = Paint()..color = Colors.white;
-  final Paint _paintLifeOff   = Paint()..color = Colors.white.withValues(alpha: 0.15);
+  final Paint _paintRingBg = Paint()
+    ..color = Colors.white12
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 10;
+  final Paint _paintRingFg = Paint()
+    ..color = Colors.cyanAccent
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 10
+    ..strokeCap = StrokeCap.round;
+  final Paint _paintGlow = Paint()..blendMode = BlendMode.plus;
+  final Paint _paintFlash = Paint();
+  final Paint _paintIndBg = Paint()
+    ..color = Colors.black.withValues(alpha: 0.6);
+  final Paint _paintLifeOn = Paint()..color = Colors.white;
+  final Paint _paintLifeOff = Paint()
+    ..color = Colors.white.withValues(alpha: 0.15);
 
   // 캐싱된 이미지 소스 Rect (이미지 로드 후 고정)
   late Rect _arrowSrc;
@@ -148,23 +162,24 @@ class ShieldGuardFlameGame extends FlameGame {
   void _sfx(String path) {
     _sfxPlayers[path]?.play(AssetSource(path));
   }
+
   // OGG 권장: MP3는 Android에서 루프 지점에 갭 발생. OGG는 루프 갭 없음.
-  static const _bgmNormal  = 'sheild_guard/Village Consort.ogg';
-  static const _bgmUrgent  = 'sheild_guard/Crunk Knight.ogg';
+  static const _bgmNormal = 'sheild_guard/Village Consort.ogg';
+  static const _bgmUrgent = 'sheild_guard/Crunk Knight.ogg';
 
   // 스프라이트
-  late List<ui.Image> _shieldImages;  // shield_0~4
+  late List<ui.Image> _shieldImages; // shield_0~4
   late ui.Image _shieldGlow;
   late ui.Image _arrowImg;
   late ui.Image _indicatorImg;
   late ui.Image _lifeIconImg;
-  List<ui.Image>? _castleImages;      // castle_0~4 (선택)
-
+  List<ui.Image>? _castleImages; // castle_0~4 (선택)
 
   ShieldGuardFlameGame({
     this.inputStream,
     required this.config,
     required this.onGameEnd,
+    this.startPaused = false,
   });
 
   @override
@@ -184,10 +199,10 @@ class ShieldGuardFlameGame extends FlameGame {
     _shieldImages = await Future.wait(
       List.generate(5, (i) => _loadImg('shield_$i.png')),
     );
-    _shieldGlow   = await _loadImg('shield_glow.png');
-    _arrowImg     = await _loadImg('arrow.png');
+    _shieldGlow = await _loadImg('shield_glow.png');
+    _arrowImg = await _loadImg('arrow.png');
     _indicatorImg = await _loadImg('indicator.png');
-    _lifeIconImg  = await _loadImg('life_icon.png');
+    _lifeIconImg = await _loadImg('life_icon.png');
 
     // 성 배경 (없으면 그냥 단색 배경 유지)
     try {
@@ -199,18 +214,41 @@ class ShieldGuardFlameGame extends FlameGame {
     }
 
     // 이미지 소스 Rect 캐싱
-    _arrowSrc     = Rect.fromLTWH(0, 0, _arrowImg.width.toDouble(),     _arrowImg.height.toDouble());
-    _indicatorSrc = Rect.fromLTWH(0, 0, _indicatorImg.width.toDouble(), _indicatorImg.height.toDouble());
-    _lifeIconSrc  = Rect.fromLTWH(0, 0, _lifeIconImg.width.toDouble(),  _lifeIconImg.height.toDouble());
+    _arrowSrc = Rect.fromLTWH(
+        0, 0, _arrowImg.width.toDouble(), _arrowImg.height.toDouble());
+    _indicatorSrc = Rect.fromLTWH(
+        0, 0, _indicatorImg.width.toDouble(), _indicatorImg.height.toDouble());
+    _lifeIconSrc = Rect.fromLTWH(
+        0, 0, _lifeIconImg.width.toDouble(), _lifeIconImg.height.toDouble());
 
     // TextPaint 캐싱
-    _tpScore    = TextPaint(style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white,    shadows: [Shadow(color: Colors.black, blurRadius: 4)]));
-    _tpHudLabel = TextPaint(style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white,    shadows: [Shadow(color: Colors.black, blurRadius: 6)]));
-    _tpHudCount = TextPaint(style: const TextStyle(fontSize: 52, fontWeight: FontWeight.bold, color: Colors.white,    shadows: [Shadow(color: Colors.black, blurRadius: 4)]));
-    _tpHoldHint = TextPaint(style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.cyanAccent, shadows: [Shadow(color: Colors.black, blurRadius: 6)]));
+    _tpScore = TextPaint(
+        style: const TextStyle(
+            fontSize: 40,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            shadows: [Shadow(color: Colors.black, blurRadius: 4)]));
+    _tpHudLabel = TextPaint(
+        style: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            shadows: [Shadow(color: Colors.black, blurRadius: 6)]));
+    _tpHudCount = TextPaint(
+        style: const TextStyle(
+            fontSize: 52,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            shadows: [Shadow(color: Colors.black, blurRadius: 4)]));
+    _tpHoldHint = TextPaint(
+        style: const TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.bold,
+            color: Colors.cyanAccent,
+            shadows: [Shadow(color: Colors.black, blurRadius: 6)]));
 
     _sub = inputStream?.listen((v) => currentPosition = v.clamp(0.0, 1.0));
-    isRunning = true;
+    isRunning = !startPaused;
 
     // BGM + SFX 동시 재생 허용
     await AudioPlayer.global.setAudioContext(AudioContext(
@@ -243,7 +281,11 @@ class ShieldGuardFlameGame extends FlameGame {
     if (!isRunning) return;
 
     _timeLeft -= dt;
-    if (_timeLeft <= 0) { endGame(); return; }
+    _elapsedSeconds += dt;
+    if (_timeLeft <= 0) {
+      endGame();
+      return;
+    }
 
     _updateArrows(dt);
     _updateHold(dt);
@@ -272,6 +314,8 @@ class ShieldGuardFlameGame extends FlameGame {
   }
 
   void _applyDamage() {
+    if (_hasEnded) return;
+    _failedCount++;
     _wallHealth = (_wallHealth - 1).clamp(0, 5);
     _hitFlash = 0.4;
     _sfx('100-CC0-SFX/slam_01.ogg'); // 피해
@@ -340,7 +384,10 @@ class ShieldGuardFlameGame extends FlameGame {
         _blockedCount++;
         _sfx('100-CC0-SFX/bell_01.ogg'); // 홀드 성공
         _spawnSuccessParticles(size.x * 0.15, shieldY);
-        if (_blockedCount >= _clearTarget) { endGame(); return; }
+        if (_blockedCount >= _clearTarget) {
+          endGame();
+          return;
+        }
         holding.phase = _ArrowPhase.done;
         _holdingArrow = null;
         _holdTimer = 0;
@@ -389,7 +436,8 @@ class ShieldGuardFlameGame extends FlameGame {
       final angle = _rng.nextDouble() * 2 * pi;
       final speed = 80 + _rng.nextDouble() * 160;
       _particles.add(_Particle(
-        x: cx, y: cy,
+        x: cx,
+        y: cy,
         vx: cos(angle) * speed,
         vy: sin(angle) * speed,
         color: colors[i % colors.length],
@@ -403,7 +451,8 @@ class ShieldGuardFlameGame extends FlameGame {
       final angle = _rng.nextDouble() * 2 * pi;
       final speed = 60 + _rng.nextDouble() * 120;
       _particles.add(_Particle(
-        x: cx, y: cy,
+        x: cx,
+        y: cy,
         vx: cos(angle) * speed,
         vy: sin(angle) * speed,
         color: Colors.redAccent,
@@ -449,7 +498,8 @@ class ShieldGuardFlameGame extends FlameGame {
     _drawShield(canvas);
     // 꽂힌 화살 (방패 앞)
     for (final arrow in _arrows) {
-      if (arrow.phase == _ArrowPhase.holding) _drawArrow(canvas, arrow, xOffset: _shakeOffset);
+      if (arrow.phase == _ArrowPhase.holding)
+        _drawArrow(canvas, arrow, xOffset: _shakeOffset);
     }
 
     if (_holdingArrow != null) {
@@ -458,7 +508,8 @@ class ShieldGuardFlameGame extends FlameGame {
 
     // 피격 플래시
     if (_hitFlash > 0) {
-      _paintFlash.color = Colors.red.withValues(alpha: (_hitFlash / 0.4) * 0.35);
+      _paintFlash.color =
+          Colors.red.withValues(alpha: (_hitFlash / 0.4) * 0.35);
       canvas.drawRect(Rect.fromLTWH(0, 0, size.x, size.y), _paintFlash);
     }
 
@@ -475,14 +526,17 @@ class ShieldGuardFlameGame extends FlameGame {
     const indicatorSize = 100.0;
 
     // 화살 스프라이트 (그림자로 가시성 향상)
-    final arrowDst  = Rect.fromCenter(center: Offset(cx, cy),         width: arrowW,        height: arrowH);
-    final shadowDst = Rect.fromCenter(center: Offset(cx + 3, cy + 3), width: arrowW,        height: arrowH);
+    final arrowDst =
+        Rect.fromCenter(center: Offset(cx, cy), width: arrowW, height: arrowH);
+    final shadowDst = Rect.fromCenter(
+        center: Offset(cx + 3, cy + 3), width: arrowW, height: arrowH);
     canvas.drawImageRect(_arrowImg, _arrowSrc, shadowDst, _paintShadow);
-    canvas.drawImageRect(_arrowImg, _arrowSrc, arrowDst,  _paintPlain);
+    canvas.drawImageRect(_arrowImg, _arrowSrc, arrowDst, _paintPlain);
 
     // ↓↑ 방향 인디케이터 스프라이트 (화살 위쪽, 검정 원 배경으로 가시성 확보)
     final indY = cy - arrowH / 2 - indicatorSize / 2 - 8;
-    final indDst = Rect.fromCenter(center: Offset(cx, indY), width: indicatorSize, height: indicatorSize);
+    final indDst = Rect.fromCenter(
+        center: Offset(cx, indY), width: indicatorSize, height: indicatorSize);
 
     canvas.drawCircle(Offset(cx, indY), indicatorSize / 2 + 6, _paintIndBg);
 
@@ -502,18 +556,21 @@ class ShieldGuardFlameGame extends FlameGame {
     final shieldW = _shieldW;
     final shieldH = _shieldH;
 
-    final dst = Rect.fromCenter(center: Offset(shieldX, shieldY), width: shieldW, height: shieldH);
+    final dst = Rect.fromCenter(
+        center: Offset(shieldX, shieldY), width: shieldW, height: shieldH);
 
     // 손상 단계 스프라이트
     final idx = (5 - _wallHealth).clamp(0, 4);
     final img = _shieldImages[idx];
-    final src = Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
+    final src =
+        Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
     canvas.drawImageRect(img, src, dst, _paintPlain);
 
     // 홀드 중: 글로우 오버레이 (BlendMode.plus) + 펄스
     if (_holdingArrow != null) {
       final pulse = (sin(_glowPulse) * 0.5 + 0.5);
-      final glowSrc = Rect.fromLTWH(0, 0, _shieldGlow.width.toDouble(), _shieldGlow.height.toDouble());
+      final glowSrc = Rect.fromLTWH(
+          0, 0, _shieldGlow.width.toDouble(), _shieldGlow.height.toDouble());
       _paintGlow.color = Colors.white.withValues(alpha: 0.4 + pulse * 0.4);
       canvas.drawImageRect(_shieldGlow, glowSrc, dst, _paintGlow);
     }
@@ -526,7 +583,6 @@ class ShieldGuardFlameGame extends FlameGame {
     final shieldY = h * 0.1 + (1.0 - currentPosition) * h * 0.8;
 
     final ringRadius = _shieldW * 0.7;
-    const ringWidth = 10.0;
     final progress = (_holdTimer / _holdRequired).clamp(0.0, 1.0);
 
     // 배경 링
@@ -535,22 +591,40 @@ class ShieldGuardFlameGame extends FlameGame {
     // 진행 링
     canvas.drawArc(
       Rect.fromCircle(center: Offset(shieldX, shieldY), radius: ringRadius),
-      -pi / 2, 2 * pi * progress, false, _paintRingFg,
+      -pi / 2,
+      2 * pi * progress,
+      false,
+      _paintRingFg,
     );
 
     // 저항 방향 힌트 (화살 반대 방향)
     final hint = holding.isDown ? '↑ 버텨!' : '↓ 버텨!';
-    _tpHoldHint.render(canvas, hint, Vector2(shieldX, shieldY - ringRadius - 24), anchor: Anchor.center);
+    _tpHoldHint.render(
+        canvas, hint, Vector2(shieldX, shieldY - ringRadius - 24),
+        anchor: Anchor.center);
   }
 
   void _drawScore(Canvas canvas) {
-    _tpScore.render(canvas, '점수: $score', Vector2(size.x - 16, 16), anchor: Anchor.topRight);
+    _tpScore.render(canvas, '점수: $score', Vector2(size.x - 16, 16),
+        anchor: Anchor.topRight);
   }
 
   void _drawHud(Canvas canvas) {
     // 막은 화살 수 / 목표 (상단 중앙)
-    _tpHudLabel.render(canvas, '막은 화살',              Vector2(size.x / 2, 6),  anchor: Anchor.topCenter);
-    _tpHudCount.render(canvas, '$_blockedCount / $_clearTarget', Vector2(size.x / 2, 42), anchor: Anchor.topCenter);
+    _tpHudLabel.render(canvas, '막은 화살', Vector2(size.x / 2, 6),
+        anchor: Anchor.topCenter);
+    _tpHudCount.render(
+        canvas, '$_blockedCount / $_clearTarget', Vector2(size.x / 2, 42),
+        anchor: Anchor.topCenter);
+
+    // 설정 화면에서 선택한 게임시간을 기준으로 한 실시간 남은 시간.
+    // ceil()을 사용해 실제 종료 직전까지 1초로 보이고 음수가 표시되지 않게 한다.
+    final remainingSeconds = max(0.0, _timeLeft).ceil();
+    final timerX = size.x * 0.75;
+    _tpHudLabel.render(canvas, '남은 시간 (s)', Vector2(timerX, 6),
+        anchor: Anchor.topCenter);
+    _tpHudCount.render(canvas, '$remainingSeconds', Vector2(timerX, 42),
+        anchor: Anchor.topCenter);
 
     // 목숨 아이콘 스프라이트 (상단 좌측)
     const iconSize = 52.0;
@@ -560,9 +634,14 @@ class ShieldGuardFlameGame extends FlameGame {
 
     for (int i = 0; i < 5; i++) {
       final cx = startX + i * spacing + iconSize / 2;
-      final iconDst = Rect.fromCenter(center: Offset(cx, topY + iconSize / 2), width: iconSize, height: iconSize);
+      final iconDst = Rect.fromCenter(
+          center: Offset(cx, topY + iconSize / 2),
+          width: iconSize,
+          height: iconSize);
       canvas.drawImageRect(
-        _lifeIconImg, _lifeIconSrc, iconDst,
+        _lifeIconImg,
+        _lifeIconSrc,
+        iconDst,
         i < _wallHealth ? _paintLifeOn : _paintLifeOff,
       );
     }
@@ -573,23 +652,30 @@ class ShieldGuardFlameGame extends FlameGame {
   }
 
   void endGame() {
+    if (_hasEnded) return;
+    _hasEnded = true;
     isRunning = false;
     _sub?.cancel();
     FlameAudio.bgm.stop();
     _sfx(_blockedCount >= _clearTarget
-        ? '100-CC0-SFX/gong_01.ogg'         // 클리어
+        ? '100-CC0-SFX/gong_01.ogg' // 클리어
         : '100-CC0-SFX/door_close_04.ogg'); // 게임오버
     final result = GameResult(
       gameId: 'shield_guard',
       score: score,
       maxPossibleScore: _clearTarget * 10,
-      accuracy: 0,
-      duration: config.gameDuration,
+      accuracy: GameResult.accuracyFromCounts(
+        hits: _blockedCount,
+        misses: _failedCount,
+      ),
+      duration: Duration(milliseconds: (_elapsedSeconds * 1000).round()),
       difficultyLevel: config.difficultyLevel,
       bodyPart: config.bodyPart,
       timestamp: DateTime.now(),
       calibrationMin: config.normalizer.minAngle,
       calibrationMax: config.normalizer.maxAngle,
+      hits: _blockedCount,
+      misses: _failedCount,
     );
     onGameEnd(result);
   }
@@ -636,14 +722,21 @@ class _ShieldGuardGameState extends State<ShieldGuardGame> {
     // Jetson으로부터 전송되는 모터 [0]번의 Pos 데이터를 파싱하여 높이 매핑
     final stream = _isSim
         ? null
-        : widget.bluetoothService.dataStream
-            .map((s) => double.tryParse(s.trim()))
-            .where((v) => v != null)
-            .map((a) => widget.config.normalizer.normalize(a!));
+        : widget.bluetoothService.telemetryStream
+            .map((frame) {
+              _motor.notifyDataReceived();
+              return frame;
+            })
+            .map((frame) => frame.jointForPart(widget.config.bodyPart))
+            .where((joint) => joint != null && joint.online)
+            .map((joint) => RobotProtocol.toUiDegrees(
+                widget.config.bodyPart, joint!.positionDegrees))
+            .map(widget.config.normalizer.normalize);
 
     _game = ShieldGuardFlameGame(
       inputStream: stream,
       config: widget.config,
+      startPaused: !_isSim,
       onGameEnd: (r) {
         _motor.safeStop();
         _motor.dispose();
@@ -657,22 +750,46 @@ class _ShieldGuardGameState extends State<ShieldGuardGame> {
     );
 
     if (!_isSim) {
-      // --- 게임 시작 시 자동 명령 전송 부분 수정 ---
-      try {
-        // 1. 0번 모터(rShoulderEF)를 타겟으로 지정
-        widget.bluetoothService.sendBytes(Uint8List.fromList(utf8.encode("PART:rShoulderEF\n")));
-        
-        // 2. 약간의 딜레이(100ms) 후 arom 모드 실행
-        // (블루투스 직렬 통신에서 명령이 겹치지 않도록 방지)
-        Future.delayed(const Duration(milliseconds: 100), () {
-          widget.bluetoothService.sendBytes(Uint8List.fromList(utf8.encode("arom\n")));
-        });
-      } catch (e) {
-        debugPrint("Bluetooth Send Error: $e");
-      }
-      
+      unawaited(_moveToRomMidpointAndStart());
       _motor.startWatchdog();
     }
+  }
+
+  Future<void> _moveToRomMidpointAndStart() async {
+    final part = widget.config.bodyPart;
+    final midpoint = (widget.config.normalizer.minAngle +
+            widget.config.normalizer.maxAngle) /
+        2.0;
+
+    // Only the selected joint is changed from the standard measurement/
+    // exercise start posture; all other joints remain at that posture.
+    if (!await _motor.selectJoint(part)) return;
+    if (!await _motor.startIsometric(midpoint, 1.5)) return;
+    try {
+      await widget.bluetoothService.telemetryStream
+          .map((frame) {
+            _motor.notifyDataReceived();
+            return frame;
+          })
+          .map((frame) => frame.jointForPart(part))
+          .where((joint) => joint != null && joint.online)
+          .map((joint) =>
+              RobotProtocol.toUiDegrees(part, joint!.positionDegrees))
+          .firstWhere((angle) => (angle - midpoint).abs() <= 2.0)
+          .timeout(const Duration(seconds: 15));
+    } on TimeoutException {
+      await _motor.safeStop();
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    await _motor.safeStop();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+    if (!await _motor.selectJoint(part)) return;
+    if (!await _motor.startArom()) return;
+    if (!mounted) return;
+    _game.isRunning = true;
   }
 
   @override

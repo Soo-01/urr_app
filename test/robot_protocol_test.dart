@@ -33,6 +33,37 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('inverts only right shoulder EF and right elbow angles', () {
+      expect(
+        RobotProtocol.cpmForPart(
+          partCode: 'rShoulderEF',
+          minDegrees: 10,
+          maxDegrees: 90,
+          speedRadPerSec: 0.05,
+        ),
+        'cpm,-90,-10,0.05',
+      );
+      expect(
+        RobotProtocol.isometricForPart(
+          partCode: 'rElbow',
+          targetDegrees: 60,
+          holdSeconds: 5,
+        ),
+        'isometric,-60,5',
+      );
+      expect(
+        RobotProtocol.isotonicForPart(
+          partCode: 'rShoulderRo',
+          targetDegrees: 60,
+          resistanceKg: 1,
+        ),
+        'isotonic,60,1',
+      );
+      expect(RobotProtocol.toUiDegrees('rElbow', -45), 45);
+      expect(RobotProtocol.toUiDegrees('rShoulderEF', -30), 30);
+      expect(RobotProtocol.toUiDegrees('rShoulderRo', -30), -30);
+    });
   });
 
   test('parses joint state JSON and converts radians to degrees', () {

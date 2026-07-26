@@ -6,6 +6,13 @@ import 'dart:math' as math;
 class RobotProtocol {
   RobotProtocol._();
 
+  /// The right shoulder flexion/extension and right elbow encoders use the
+  /// opposite sign convention from the angles shown in the tablet UI.
+  static const Set<String> invertedAngleParts = {
+    'rShoulderEF',
+    'rElbow',
+  };
+
   /// Parts exposed by the tablet UI. The current motor_control_v5_2.cpp
   /// accepts only [currentlySupportedParts], but the complete list remains in
   /// the UI for future left-arm and wrist hardware.
@@ -38,6 +45,23 @@ class RobotProtocol {
   static const String stop = 'stop';
   static const String isometricStop = 'isom_stop';
 
+  static bool usesInvertedAngle(String partCode) =>
+      invertedAngleParts.contains(partCode);
+
+  static double toMotorDegrees(String partCode, double uiDegrees) {
+    if (!uiDegrees.isFinite) {
+      throw ArgumentError.value(uiDegrees, 'uiDegrees');
+    }
+    return usesInvertedAngle(partCode) ? -uiDegrees : uiDegrees;
+  }
+
+  static double toUiDegrees(String partCode, double motorDegrees) {
+    if (!motorDegrees.isFinite) {
+      throw ArgumentError.value(motorDegrees, 'motorDegrees');
+    }
+    return usesInvertedAngle(partCode) ? -motorDegrees : motorDegrees;
+  }
+
   static String prom({double? speedRadPerSec}) {
     if (speedRadPerSec == null) return 'prom';
     if (!speedRadPerSec.isFinite || speedRadPerSec <= 0) {
@@ -64,6 +88,21 @@ class RobotProtocol {
     return 'cpm,${_number(minDegrees)},${_number(maxDegrees)}$speed';
   }
 
+  static String cpmForPart({
+    required String partCode,
+    required double minDegrees,
+    required double maxDegrees,
+    double? speedRadPerSec,
+  }) {
+    final first = toMotorDegrees(partCode, minDegrees);
+    final second = toMotorDegrees(partCode, maxDegrees);
+    return cpm(
+      minDegrees: math.min(first, second),
+      maxDegrees: math.max(first, second),
+      speedRadPerSec: speedRadPerSec,
+    );
+  }
+
   static String isometric({
     required double targetDegrees,
     required double holdSeconds,
@@ -74,6 +113,16 @@ class RobotProtocol {
     return 'isometric,${_number(targetDegrees)},${_number(holdSeconds)}';
   }
 
+  static String isometricForPart({
+    required String partCode,
+    required double targetDegrees,
+    required double holdSeconds,
+  }) =>
+      isometric(
+        targetDegrees: toMotorDegrees(partCode, targetDegrees),
+        holdSeconds: holdSeconds,
+      );
+
   static String isotonic({
     required double targetDegrees,
     required double resistanceKg,
@@ -83,6 +132,16 @@ class RobotProtocol {
     }
     return 'isotonic,${_number(targetDegrees)},${_number(resistanceKg)}';
   }
+
+  static String isotonicForPart({
+    required String partCode,
+    required double targetDegrees,
+    required double resistanceKg,
+  }) =>
+      isotonic(
+        targetDegrees: toMotorDegrees(partCode, targetDegrees),
+        resistanceKg: resistanceKg,
+      );
 
   /// UI speed levels 1..10 map to a conservative 0.01..0.10 rad/s.
   static double speedLevelToRadPerSec(String level) {

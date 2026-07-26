@@ -30,14 +30,18 @@ enum CognitiveLevel {
 
   /// 파티클 수
   int get particleCount => [0, 5, 15][level - 1];
+
   /// 오브젝트 크기 배율
   double get sizeMultiplier => [2.0, 1.2, 1.0][level - 1];
+
   /// HUD 표시 범위
   bool get showCombo => level >= 2;
   bool get showTimer => level >= 2;
   bool get showLives => level >= 3;
+
   /// 자동 음성 가이드 여부
   bool get autoVoiceGuide => level <= 2;
+
   /// 배경 복잡도 (0=단색, 1=그라디언트, 2=테마배경)
   int get bgComplexity => level - 1;
 }
@@ -68,14 +72,25 @@ class GameConfig {
   });
 
   /// Brunnstrom 단계별 ROM 사용 비율
-  double get romRatio => const {2: 0.4, 3: 0.6, 4: 0.8, 5: 1.0, 6: 1.0}[brunnstromStage.level] ?? 0.8;
+  double get romRatio =>
+      const {2: 0.4, 3: 0.6, 4: 0.8, 5: 1.0, 6: 1.0}[brunnstromStage.level] ??
+      0.8;
 
   /// Brunnstrom 단계별 게임 속도 배율 (1.0 = 보통)
-  double get speedMultiplier => const {2: 0.4, 3: 0.6, 4: 0.8, 5: 1.0, 6: 1.2}[brunnstromStage.level] ?? 0.8;
+  double get speedMultiplier =>
+      const {2: 0.4, 3: 0.6, 4: 0.8, 5: 1.0, 6: 1.2}[brunnstromStage.level] ??
+      0.8;
 
   /// Brunnstrom 단계별 타겟 크기 배율
   double get targetSizeMultiplier {
-    final brunnstrom = const {2: 2.0, 3: 1.5, 4: 1.2, 5: 1.0, 6: 0.8}[brunnstromStage.level] ?? 1.2;
+    final brunnstrom = const {
+          2: 2.0,
+          3: 1.5,
+          4: 1.2,
+          5: 1.0,
+          6: 0.8
+        }[brunnstromStage.level] ??
+        1.2;
     return brunnstrom * cognitiveLevel.sizeMultiplier;
   }
 
@@ -148,6 +163,17 @@ class GameResult {
     this.misses = 0,
     this.angleHistory = const [],
   });
+
+  static double accuracyFromCounts({
+    required int hits,
+    required int misses,
+  }) {
+    if (hits < 0 || misses < 0) {
+      throw ArgumentError('hits and misses must be non-negative');
+    }
+    final attempts = hits + misses;
+    return attempts == 0 ? 0 : hits / attempts;
+  }
 
   Map<String, dynamic> toJson() => {
         'gameId': gameId,

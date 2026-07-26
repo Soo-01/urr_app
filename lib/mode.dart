@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'main.dart';
 import 'record.dart';
 import 'isometric_force_tracker.dart';
+import 'joint_options.dart';
 import 'robot_command_service.dart';
 import 'robot_protocol.dart';
 
@@ -419,7 +420,8 @@ class _ModeSelectScreenState extends State<ModeSelectScreen> {
       if (measurementMode == null) return;
 
       setState(() {
-        final angle = joint.positionDegrees;
+        final angle =
+            RobotProtocol.toUiDegrees(_selectedPart!, joint.positionDegrees);
         _currentAngles[measurementMode] = angle;
         final previousMin = _minAngles[measurementMode];
         final previousMax = _maxAngles[measurementMode];
@@ -481,7 +483,7 @@ class _ModeSelectScreenState extends State<ModeSelectScreen> {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
     // 공통: 사용자 정보 확인
-    if (userProvider.name.isEmpty || userProvider.name == " ") {
+    if (!userProvider.hasRegisteredProfile) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('사용자 정보를 먼저 입력하거나 불러와주세요.')),
       );
@@ -489,6 +491,18 @@ class _ModeSelectScreenState extends State<ModeSelectScreen> {
     }
 
     // 공통: 부위 선택 안 됐으면 경고 후 리턴
+    if (action == 'receive' && !userProvider.hasAnyRomMeasurement) {
+      final isKorean = loc.localeName.toLowerCase().startsWith('ko');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isKorean
+              ? '운동을 시작하기 전에 PROM 또는 AROM을 측정해 주세요.'
+              : 'Measure either PROM or AROM before starting exercise.'),
+        ),
+      );
+      return false;
+    }
+
     if (_selectedMode != 'Stop' && _selectedPart == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(loc.selectPart)),
@@ -516,7 +530,8 @@ class _ModeSelectScreenState extends State<ModeSelectScreen> {
               return false;
             }
             final speed = RobotProtocol.speedLevelToRadPerSec(level);
-            cmd = RobotProtocol.cpm(
+            cmd = RobotProtocol.cpmForPart(
+              partCode: _selectedPart!,
               minDegrees: minDegrees,
               maxDegrees: maxDegrees,
               speedRadPerSec: speed,
@@ -548,8 +563,11 @@ class _ModeSelectScreenState extends State<ModeSelectScreen> {
               );
               return false;
             }
-            cmd = RobotProtocol.isometric(
-                targetDegrees: target, holdSeconds: hold);
+            cmd = RobotProtocol.isometricForPart(
+              partCode: _selectedPart!,
+              targetDegrees: target,
+              holdSeconds: hold,
+            );
             widget.onModeChanged?.call(_selectedMode, '$target,$hold');
           } else if (action == 'stop' && _isomActive) {
             cmd = RobotProtocol.isometricStop;
@@ -577,7 +595,8 @@ class _ModeSelectScreenState extends State<ModeSelectScreen> {
               );
               return false;
             }
-            cmd = RobotProtocol.isotonic(
+            cmd = RobotProtocol.isotonicForPart(
+              partCode: _selectedPart!,
               targetDegrees: target,
               resistanceKg: resistance,
             );
@@ -703,24 +722,12 @@ class _ModeSelectScreenState extends State<ModeSelectScreen> {
                           child: DropdownMenu<String>(
                             initialSelection: _selectedPart,
                             hintText: loc.selectPart, // "Select Part"
-                            dropdownMenuEntries: [
-                              DropdownMenuEntry(
-                                  value: 'lShoulderEF', label: loc.lShoulderEF),
-                              DropdownMenuEntry(
-                                  value: 'lShoulderRo', label: loc.lShoulderRo),
-                              DropdownMenuEntry(
-                                  value: 'lElbow', label: loc.lElbow),
-                              DropdownMenuEntry(
-                                  value: 'lWrist', label: loc.lWrist),
-                              DropdownMenuEntry(
-                                  value: 'rShoulderEF', label: loc.rShoulderEF),
-                              DropdownMenuEntry(
-                                  value: 'rShoulderRo', label: loc.rShoulderRo),
-                              DropdownMenuEntry(
-                                  value: 'rElbow', label: loc.rElbow),
-                              DropdownMenuEntry(
-                                  value: 'rWrist', label: loc.rWrist),
-                            ],
+                            dropdownMenuEntries: rehabilitationJointCodes
+                                .map((code) => DropdownMenuEntry(
+                                      value: code,
+                                      label: localizedJointLabel(code, loc),
+                                    ))
+                                .toList(),
                             onSelected: (value) async {
                               setState(() => _selectedPart = value);
                               if (value != null) {
