@@ -71,6 +71,15 @@ class GameHubScreen extends StatelessWidget {
           icon: Icons.pool,
           color: const Color(0xFF0288D1),
           joint: 'rShoulderEF'),
+      // 최종 목표 관절은 팔꿈치이지만, 앱에 아직 연동되지 않아 원장님 지시로
+      // 우선 어깨로 개발한다 (lib/games/games/tug_of_war_game.dart 상단 참고).
+      _GameInfo(
+          id: 'tug_of_war',
+          name: loc.tugOfWar,
+          description: loc.tugOfWarDesc,
+          icon: Icons.sports_kabaddi,
+          color: const Color(0xFF8D6E63),
+          joint: 'rShoulderEF'),
     ];
 
     final elbowGames = [
@@ -94,13 +103,6 @@ class GameHubScreen extends StatelessWidget {
           description: loc.potionMakerDesc,
           icon: Icons.science,
           color: const Color(0xFFAB47BC),
-          joint: 'rElbow'),
-      _GameInfo(
-          id: 'tug_of_war',
-          name: loc.tugOfWar,
-          description: loc.tugOfWarDesc,
-          icon: Icons.sports_kabaddi,
-          color: const Color(0xFF8D6E63),
           joint: 'rElbow'),
     ];
 
