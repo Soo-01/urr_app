@@ -36,10 +36,31 @@ import '../game_result_screen.dart';
 /// 난이도에 따라 등장하는 줄다리기 상대 동물 (docs/tug_of_war_build_guide.md 4번).
 enum AnimalType { chimpanzee, orangutan, gorilla }
 
+/// 떨어지기 연출용 먼지/물보라 파티클 (shield_guard_game.dart의 _Particle과 동일 패턴).
+class _FallParticle {
+  double x, y, vx, vy;
+  double life = 1.0;
+  final Color color;
+  final double radius;
+
+  _FallParticle({
+    required this.x,
+    required this.y,
+    required this.vx,
+    required this.vy,
+    required this.color,
+    required this.radius,
+  });
+}
+
 class TugOfWarFlameGame extends FlameGame {
   final Stream<double>? inputStream;
   final GameConfig config;
   final void Function(GameResult) onGameEnd;
+
+  /// 떨어지기 연출 시작 시 1회 호출 (모터 즉시 정지 등에 사용).
+  /// docs/tug_of_war_build_guide.md 5번 "모터 즉시 정지" 참고.
+  final VoidCallback? onFallTriggered;
 
   StreamSubscription<double>? _sub;
 
@@ -80,10 +101,23 @@ class TugOfWarFlameGame extends FlameGame {
   double _countdown = 3.0;
   bool get isCountingDown => _countdown > 0;
 
+  // ── 떨어지기 연출 (4단계: 비틀거림 → 발 미끄러짐 → 낙하 → 착지/물보라) ────
+  // docs/tug_of_war_build_guide.md 5번 "떨어지기 애니메이션" 참고.
+  bool _isFalling = false;
+  bool _isPlayerFalling = false;
+  double _fallProgress = 0.0; // 0.0~1.0
+  static const double _fallDuration = 1.2; // 초
+  final List<_FallParticle> _fallParticles = [];
+  final Random _rng = Random();
+
+  /// 떨어지기 연출 진행 중 여부 (모터 등장성 저항 재전송 차단용).
+  bool get isFalling => _isFalling;
+
   TugOfWarFlameGame({
     this.inputStream,
     required this.config,
     required this.onGameEnd,
+    this.onFallTriggered,
   });
 
   @override
@@ -119,24 +153,91 @@ class TugOfWarFlameGame extends FlameGame {
       return;
     }
 
+    if (_isFalling) {
+      _updateFall(dt);
+      return;
+    }
+
     _elapsedSeconds += dt;
     _detectPull(dt);
     _updateAnimalAi();
     _updateRopePosition(dt);
 
     if (_ropePosition >= 1.0) {
-      _endGame(won: true);
+      _triggerFall(isPlayerFalling: false); // 상대가 떨어짐 -> 승리
     } else if (_ropePosition <= -1.0) {
-      _endGame(won: false);
+      _triggerFall(isPlayerFalling: true); // 플레이어가 떨어짐 -> 패배
     }
+  }
+
+  /// 떨어지기 연출 시작. 로프는 절벽 끝(±1.0)에 고정하고 모터를 즉시 멈춘다.
+  void _triggerFall({required bool isPlayerFalling}) {
+    if (_isFalling) return;
+    _isFalling = true;
+    _isPlayerFalling = isPlayerFalling;
+    _fallProgress = 0.0;
+    _ropePosition = isPlayerFalling ? -1.0 : 1.0;
+    onFallTriggered?.call();
+  }
+
+  /// 4단계 낙하 연출 진행: 0.0~0.2 비틀거림, 0.2~0.4 발 미끄러짐(먼지),
+  /// 0.4~0.8 낙하, 0.8~1.0 착지/물보라. 완료되면 실제로 게임을 종료한다.
+  void _updateFall(double dt) {
+    final wasSlip = _fallProgress >= 0.2 && _fallProgress < 0.4;
+    final wasSplash = _fallProgress >= 0.8;
+
+    _fallProgress = (_fallProgress + dt / _fallDuration).clamp(0.0, 1.0);
+    _updateFallParticles(dt);
+
+    if (!wasSlip && _fallProgress >= 0.2 && _fallProgress < 0.4) {
+      _spawnFallParticles(dust: true); // 발 미끄러짐 진입 -> 먼지
+    }
+    if (!wasSplash && _fallProgress >= 0.8) {
+      _spawnFallParticles(dust: false); // 착지 진입 -> 물보라
+    }
+
+    if (_fallProgress >= 1.0) {
+      _endGame(won: !_isPlayerFalling);
+    }
+  }
+
+  void _spawnFallParticles({required bool dust}) {
+    final x = _isPlayerFalling ? size.x * 0.12 : size.x * 0.88;
+    final y = dust ? size.y * 0.72 : size.y * 0.95;
+    final color = dust ? const Color(0xFF9E8563) : const Color(0xFF8ECFEA);
+    for (int i = 0; i < 14; i++) {
+      final angle = dust ? _rng.nextDouble() * pi : _rng.nextDouble() * 2 * pi;
+      final speed = 60 + _rng.nextDouble() * 100;
+      _fallParticles.add(_FallParticle(
+        x: x,
+        y: y,
+        vx: cos(angle) * speed,
+        vy: sin(angle) * speed - (dust ? 0 : 80),
+        color: color,
+        radius: 3 + _rng.nextDouble() * 3,
+      ));
+    }
+  }
+
+  void _updateFallParticles(double dt) {
+    for (final p in _fallParticles) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 220 * dt;
+      p.life -= dt * 1.2;
+    }
+    _fallParticles.removeWhere((p) => p.life <= 0);
   }
 
   /// 정적인 각도가 아니라 폄 -> 굽힘으로의 동적 전환을 하나의 "당기기"로 센다.
   void _detectPull(double dt) {
     final delta = currentPosition - _prevPosition;
 
-    // 1. 팔꿈치가 굽혀지기 시작 (당기기 시작)
-    if (!_isPulling && delta < -_pullThreshold) {
+    // 1. 팔꿈치가 굽혀지기 시작 (당기기 시작) — position 증가 = 폄(0.0)→굽힘(1.0).
+    // (이전 코드는 부호가 반대였음: position이 "감소"할 때를 당기기 시작으로
+    //  오판정해, 실제로 굽히는 방향으로만 움직여서는 당기기가 전혀 기록되지
+    //  않는 버그가 있었음.)
+    if (!_isPulling && delta > _pullThreshold) {
       _isPulling = true;
       _pullStartPosition = currentPosition;
       _pullElapsed = 0;
@@ -145,12 +246,12 @@ class TugOfWarFlameGame extends FlameGame {
     if (_isPulling) {
       _pullElapsed += dt;
 
-      // 2. 다시 펴지기 시작하면 한 번의 당기기 완료
-      // (delta >= 0 이면 프레임 간 미세한 정지에도 조기 종료되어 슬라이더/센서
+      // 2. 다시 펴지기(position 감소) 시작하면 한 번의 당기기 완료.
+      // (delta <= 0 이면 프레임 간 미세한 정지에도 조기 종료되어 슬라이더/센서
       //  입력이 힘으로 반영되지 않는 문제가 있었음 -> 임계값으로 완화)
-      if (delta > _pullThreshold) {
+      if (delta < -_pullThreshold) {
         _isPulling = false;
-        final pullRange = (_pullStartPosition - currentPosition).abs();
+        final pullRange = (currentPosition - _pullStartPosition).abs();
         final pullSpeed = pullRange / (_pullElapsed > 0 ? _pullElapsed : 0.1);
         _pullPower += pullRange * pullSpeed * 20.0;
         _pullCount++;
@@ -191,7 +292,11 @@ class TugOfWarFlameGame extends FlameGame {
     _ropePosition = (_ropePosition + netForce * dt * 0.05).clamp(-1.0, 1.0);
 
     // 당긴 힘은 시간이 지나면 서서히 줄어든다 -> 계속 당겨야 로프가 밀린다.
-    _pullPower *= (1 - dt * 1.5).clamp(0.0, 1.0);
+    // (기존 1.5는 반감기 약 0.46초로, 실제 재활 환자는 물론 슬라이더로도
+    //  그 속도로 반복 당기기가 불가능해 상대(7~15)를 절대 못 이기는 문제가
+    //  있었음. 이 값은 build guide에 명시되지 않은 튜닝값이라 0.6으로 완화 —
+    //  반감기 약 1.16초, 1~2초 간격의 현실적인 반복 당기기로도 버틸 수 있게.)
+    _pullPower *= (1 - dt * 0.7).clamp(0.0, 1.0);
   }
 
   // ── 렌더 (그리기만, 로직 없음) ────────────────────────────────────────────
@@ -228,24 +333,26 @@ class TugOfWarFlameGame extends FlameGame {
     );
 
     // 플레이어 (왼쪽 사각형, 파랑)
-    canvas.drawRect(
-      Rect.fromCenter(
-        center: Offset(w * 0.12, h * 0.65),
-        width: 60,
-        height: 90,
-      ),
-      Paint()..color = Colors.blueAccent,
+    _drawCharacterBox(
+      canvas,
+      center: Offset(w * 0.12, h * 0.65),
+      width: 60,
+      height: 90,
+      color: Colors.blueAccent,
+      falling: _isFalling && _isPlayerFalling,
     );
 
     // 상대 (오른쪽 사각형, 주황)
-    canvas.drawRect(
-      Rect.fromCenter(
-        center: Offset(w * 0.88, h * 0.65),
-        width: 60,
-        height: 90,
-      ),
-      Paint()..color = Colors.deepOrangeAccent,
+    _drawCharacterBox(
+      canvas,
+      center: Offset(w * 0.88, h * 0.65),
+      width: 60,
+      height: 90,
+      color: Colors.deepOrangeAccent,
+      falling: _isFalling && !_isPlayerFalling,
     );
+
+    _drawFallParticles(canvas);
 
     // 임시 텍스트 HUD: 상대 동물 이름 + 힘 수치 (스프라이트 적용 전까지)
     final animalLabel = switch (_currentAnimal) {
@@ -289,6 +396,68 @@ class TugOfWarFlameGame extends FlameGame {
           shadows: [Shadow(color: Colors.black, blurRadius: 10)],
         ),
       ).render(canvas, '$n', Vector2(w / 2, h / 2), anchor: Anchor.center);
+    }
+  }
+
+  /// 캐릭터 사각형 한 개를 그린다. falling==true면 4단계 낙하 연출
+  /// (비틀거림 → 발 미끄러짐 → 낙하 → 착지/물보라, 사각형은 4단계에서 사라지고
+  /// 이후는 파티클로만 표현)을 적용한다.
+  void _drawCharacterBox(
+    Canvas canvas, {
+    required Offset center,
+    required double width,
+    required double height,
+    required Color color,
+    required bool falling,
+  }) {
+    if (!falling) {
+      canvas.drawRect(
+        Rect.fromCenter(center: center, width: width, height: height),
+        Paint()..color = color,
+      );
+      return;
+    }
+
+    final p = _fallProgress;
+    double dy = 0, angle = 0, scale = 1.0, alpha = 1.0;
+
+    if (p < 0.2) {
+      // 1. 비틀거림: 빠르게 좌우로 휘청
+      angle = sin((p / 0.2) * pi * 6) * 0.35;
+    } else if (p < 0.4) {
+      // 2. 발 미끄러짐: 살짝 가라앉으며 기울어짐 유지
+      final t = (p - 0.2) / 0.2;
+      dy = t * 12;
+      angle = 0.3;
+    } else if (p < 0.8) {
+      // 3. 낙하: 아래로 떨어지며 점점 작아지고 옅어짐
+      final t = (p - 0.4) / 0.4;
+      dy = 12 + t * height * 4;
+      scale = 1.0 - t * 0.75;
+      alpha = 1.0 - t * 0.7;
+    } else {
+      // 4. 착지/물보라: 사각형은 사라지고 파티클로만 표현
+      alpha = 0;
+    }
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy + dy);
+    canvas.rotate(angle);
+    canvas.scale(scale);
+    canvas.drawRect(
+      Rect.fromCenter(center: Offset.zero, width: width, height: height),
+      Paint()..color = color.withValues(alpha: alpha.clamp(0.0, 1.0)),
+    );
+    canvas.restore();
+  }
+
+  void _drawFallParticles(Canvas canvas) {
+    for (final p in _fallParticles) {
+      canvas.drawCircle(
+        Offset(p.x, p.y),
+        p.radius * p.life.clamp(0.0, 1.0),
+        Paint()..color = p.color.withValues(alpha: p.life.clamp(0.0, 1.0)),
+      );
     }
   }
 
@@ -373,6 +542,7 @@ class _TugOfWarGameState extends State<TugOfWarGame> {
     _game = TugOfWarFlameGame(
       inputStream: stream,
       config: widget.config,
+      onFallTriggered: () => _motor.safeStop(),
       onGameEnd: (r) {
         _motor.safeStop();
         _motor.dispose();
@@ -392,7 +562,9 @@ class _TugOfWarGameState extends State<TugOfWarGame> {
       // 상대(AI) 힘이 로프 위치에 따라 실시간으로 변하므로, 등장성 저항을
       // 주기적으로 갱신해 모터에 반영한다 (매 프레임 전송은 BT 스팸이 됨).
       _resistanceSync = Timer.periodic(const Duration(milliseconds: 500), (_) {
-        if (_game.isRunning) _motor.startIsotonic(_game.aiPower);
+        if (_game.isRunning && !_game.isFalling) {
+          _motor.startIsotonic(_game.aiPower);
+        }
       });
     }
   }
