@@ -1022,6 +1022,18 @@ abstract class AppLocalizations {
   /// **'Bowling Description'**
   String get bowlingDesc;
 
+  /// No description provided for @tugOfWar.
+  ///
+  /// In en, this message translates to:
+  /// **'Tug of War'**
+  String get tugOfWar;
+
+  /// No description provided for @tugOfWarDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Tug of War Description'**
+  String get tugOfWarDesc;
+
   /// No description provided for @rehabGames.
   ///
   /// In en, this message translates to:

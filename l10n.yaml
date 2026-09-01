@@ -4,3 +4,4 @@ output-localization-file: l10n.dart
 output-dir: lib/generated
 output-class: AppLocalizations
 synthetic-package: false
+untranslated-messages-file: untranslated_ko.txt

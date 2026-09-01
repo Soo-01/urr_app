@@ -477,6 +477,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get bowlingDesc => '볼링 게임 설명';
 
   @override
+  String get tugOfWar => '줄다리기';
+
+  @override
+  String get tugOfWarDesc => '줄다리기 게임 설명';
+
+  @override
   String get rehabGames => '재활 게임';
 
   @override

@@ -478,6 +478,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bowlingDesc => 'Bowling Description';
 
   @override
+  String get tugOfWar => 'Tug of War';
+
+  @override
+  String get tugOfWarDesc => 'Tug of War Description';
+
+  @override
   String get rehabGames => 'Rehab Games';
 
   @override

@@ -18,6 +18,7 @@ import 'games/potion_maker_game.dart';
 import 'games/meal_helper_game.dart';
 import 'games/swimming_game.dart';
 import 'games/bowling_game.dart';
+import 'games/tug_of_war_game.dart';
 
 class GameHubScreen extends StatelessWidget {
   final BluetoothService bluetoothService;
@@ -93,6 +94,13 @@ class GameHubScreen extends StatelessWidget {
           description: loc.potionMakerDesc,
           icon: Icons.science,
           color: const Color(0xFFAB47BC),
+          joint: 'rElbow'),
+      _GameInfo(
+          id: 'tug_of_war',
+          name: loc.tugOfWar,
+          description: loc.tugOfWarDesc,
+          icon: Icons.sports_kabaddi,
+          color: const Color(0xFF8D6E63),
           joint: 'rElbow'),
     ];
 
@@ -613,6 +621,9 @@ class _GameSetupScreenState extends State<_GameSetupScreen> {
             bluetoothService: widget.bluetoothService, config: config);
       case 'bowling':
         screen = BowlingGame(
+            bluetoothService: widget.bluetoothService, config: config);
+      case 'tug_of_war':
+        screen = TugOfWarGame(
             bluetoothService: widget.bluetoothService, config: config);
       default:
         return;
