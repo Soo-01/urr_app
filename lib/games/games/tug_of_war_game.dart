@@ -202,7 +202,7 @@ class TugOfWarFlameGame extends FlameGame {
   }
 
   void _spawnFallParticles({required bool dust}) {
-    final x = _isPlayerFalling ? size.x * 0.12 : size.x * 0.88;
+    final x = _isPlayerFalling ? _playerCenterX(size.x) : _opponentCenterX(size.x);
     final y = dust ? size.y * 0.72 : size.y * 0.95;
     final color = dust ? const Color(0xFF9E8563) : const Color(0xFF8ECFEA);
     for (int i = 0; i < 14; i++) {
@@ -307,7 +307,6 @@ class TugOfWarFlameGame extends FlameGame {
 
     final w = size.x;
     final h = size.y;
-    final midY = h * 0.55;
 
     // 다리(발판) — 화면 하단 사각형
     canvas.drawRect(
@@ -315,41 +314,34 @@ class TugOfWarFlameGame extends FlameGame {
       Paint()..color = const Color(0xFF6B4F3A),
     );
 
-    // 로프 — 중앙을 가로지르는 선
-    canvas.drawLine(
-      Offset(w * 0.1, midY),
-      Offset(w * 0.9, midY),
-      Paint()
-        ..color = const Color(0xFFD8B27C)
-        ..strokeWidth = 6,
-    );
+    // 실제로 늘어지는 로프 + 가운데 매듭(nut). 매듭은 로프 위치에 따라 좌우로
+    // 이동하고, 당기는 힘이 셀수록 로프가 팽팽해지며(처짐 감소) 미세하게 떨린다.
+    _drawRope(canvas, w, h);
 
-    // 중앙 깃발(원) — 로프 위치에 따라 좌우로 이동
-    final flagX = w * 0.5 + _ropePosition * (w * 0.35);
-    canvas.drawCircle(
-      Offset(flagX, midY),
-      18,
-      Paint()..color = Colors.redAccent,
-    );
-
-    // 플레이어 (왼쪽 사각형, 파랑)
-    _drawCharacterBox(
+    // 플레이어 (사람) — 왼쪽에서 오른쪽(로프)을 향해 버틴다.
+    _drawFighter(
       canvas,
-      center: Offset(w * 0.12, h * 0.65),
-      width: 60,
-      height: 90,
-      color: Colors.blueAccent,
+      center: Offset(_playerCenterX(w), h * 0.65),
+      facing: 1,
       falling: _isFalling && _isPlayerFalling,
+      strength: _pullPower,
+      cadence: 5.0,
+      paint: _paintHuman,
     );
 
-    // 상대 (오른쪽 사각형, 주황)
-    _drawCharacterBox(
+    // 상대 (동물) — 오른쪽에서 왼쪽(로프)을 향한다. 종류마다 체형이 다르다.
+    _drawFighter(
       canvas,
-      center: Offset(w * 0.88, h * 0.65),
-      width: 60,
-      height: 90,
-      color: Colors.deepOrangeAccent,
+      center: Offset(_opponentCenterX(w), h * 0.65),
+      facing: -1,
       falling: _isFalling && !_isPlayerFalling,
+      strength: _aiPower,
+      cadence: switch (_currentAnimal) {
+        AnimalType.chimpanzee => 9.0,
+        AnimalType.orangutan => 2.6,
+        AnimalType.gorilla => 1.7,
+      },
+      paint: _paintAnimal,
     );
 
     _drawFallParticles(canvas);
@@ -375,10 +367,11 @@ class TugOfWarFlameGame extends FlameGame {
         shadows: [Shadow(color: Colors.black, blurRadius: 4)],
       ),
     );
-    nameStyle.render(canvas, animalLabel, Vector2(w * 0.88, h * 0.65 - 65),
+    final labelX = _opponentCenterX(w);
+    nameStyle.render(canvas, animalLabel, Vector2(labelX, h * 0.65 - 65),
         anchor: Anchor.center);
     powerStyle.render(canvas, '힘 ${_aiPower.toStringAsFixed(1)}',
-        Vector2(w * 0.88, h * 0.65 - 48),
+        Vector2(labelX, h * 0.65 - 48),
         anchor: Anchor.center);
 
     // 시작 카운트다운 오버레이 — 이 동안은 상대도 당기지 않고 로프도 고정.
@@ -399,56 +392,552 @@ class TugOfWarFlameGame extends FlameGame {
     }
   }
 
-  /// 캐릭터 사각형 한 개를 그린다. falling==true면 4단계 낙하 연출
-  /// (비틀거림 → 발 미끄러짐 → 낙하 → 착지/물보라, 사각형은 4단계에서 사라지고
-  /// 이후는 파티클로만 표현)을 적용한다.
-  void _drawCharacterBox(
-    Canvas canvas, {
-    required Offset center,
-    required double width,
-    required double height,
-    required Color color,
-    required bool falling,
-  }) {
-    if (!falling) {
-      canvas.drawRect(
-        Rect.fromCenter(center: center, width: width, height: height),
-        Paint()..color = color,
-      );
-      return;
+  // ── 캐릭터 위치 (지는 쪽이 상대에게 끌려간다) ────────────────────────────
+  // 실제 줄다리기처럼 로프가 팽팽한 채로, 이기는 쪽이 로프를 감아 당기면 지는
+  // 쪽 사람이 통째로 중앙(물웅덩이)으로 끌려온다. _ropePosition +1 = 플레이어
+  // 우세(상대가 끌려옴), -1 = 플레이어 열세(플레이어가 끌려옴).
+  // 낙하 연출 중에는 계속 중앙 쪽으로 미끄러지며 떨어진다.
+  double _playerCenterX(double w) {
+    final dragged = (_ropePosition < 0 ? -_ropePosition : 0.0); // 0~1
+    var x = w * 0.12 + dragged * (w * 0.26);
+    if (_isFalling && _isPlayerFalling) x += _fallProgress * (w * 0.10);
+    return x;
+  }
+
+  double _opponentCenterX(double w) {
+    final dragged = (_ropePosition > 0 ? _ropePosition : 0.0);
+    var x = w * 0.88 - dragged * (w * 0.26);
+    if (_isFalling && !_isPlayerFalling) x -= _fallProgress * (w * 0.10);
+    return x;
+  }
+
+  // ── 로프 렌더 ────────────────────────────────────────────────────────────
+  // 로프 양 끝을 두 캐릭터의 "손"에 고정한다. 가운데 매듭(nut)은 로프를 감아
+  // 당기는 쪽(이기는 쪽)으로 이동한다. 로프는 힘의 합이 클수록 팽팽해지며,
+  // 전체가 균일하게 처진다 — 지는 쪽만 느슨해지지 않는다(오히려 끌려가는 쪽이
+  // 더 팽팽하다). 실제로 축 늘어지는 건 이미 떨어진 사람 쪽 구간뿐이다.
+  void _drawRope(Canvas canvas, double w, double h) {
+    final handY = h * 0.65 - 8;
+    var leftHand = Offset(_playerCenterX(w) + 22, handY);
+    var rightHand = Offset(_opponentCenterX(w) - 22, handY);
+
+    // 낙하 연출: 진 쪽 손이 캐릭터를 따라 아래로 내려가며 그 구간만 축 늘어진다.
+    double fallenSlack = 0;
+    if (_isFalling) {
+      fallenSlack = 70 * _fallProgress;
+      final drop = _fallProgress * h * 0.9;
+      if (_isPlayerFalling) {
+        leftHand = Offset(leftHand.dx, leftHand.dy + drop);
+      } else {
+        rightHand = Offset(rightHand.dx, rightHand.dy + drop);
+      }
     }
 
-    final p = _fallProgress;
-    double dy = 0, angle = 0, scale = 1.0, alpha = 1.0;
+    // 매듭 위치: t=0 플레이어 손, t=1 상대 손. 플레이어가 우세할수록(+1) 매듭이
+    // 플레이어 쪽(t 작음)으로 감겨온다.
+    final t = (0.5 - _ropePosition * 0.34).clamp(0.08, 0.92);
+    final knot = Offset(
+      leftHand.dx + (rightHand.dx - leftHand.dx) * t,
+      leftHand.dy + (rightHand.dy - leftHand.dy) * t,
+    );
 
-    if (p < 0.2) {
-      // 1. 비틀거림: 빠르게 좌우로 휘청
-      angle = sin((p / 0.2) * pi * 6) * 0.35;
-    } else if (p < 0.4) {
-      // 2. 발 미끄러짐: 살짝 가라앉으며 기울어짐 유지
-      final t = (p - 0.2) / 0.2;
-      dy = t * 12;
-      angle = 0.3;
-    } else if (p < 0.8) {
-      // 3. 낙하: 아래로 떨어지며 점점 작아지고 옅어짐
-      final t = (p - 0.4) / 0.4;
-      dy = 12 + t * height * 4;
-      scale = 1.0 - t * 0.75;
-      alpha = 1.0 - t * 0.7;
-    } else {
-      // 4. 착지/물보라: 사각형은 사라지고 파티클로만 표현
-      alpha = 0;
+    // 팽팽함: 플레이어 + 상대 힘이 클수록 1.0(완전 팽팽)에 가까워짐.
+    final tension = ((_pullPower + _aiPower) / 40.0).clamp(0.0, 1.0);
+    final wobble = sin(_elapsedSeconds * 5.0) * (0.6 + (1.0 - tension) * 2.2);
+    final baseSag = 12 * (1.0 - tension * 0.8) + wobble;
+
+    final leftSag =
+        baseSag + (_isFalling && _isPlayerFalling ? fallenSlack : 0);
+    final rightSag =
+        baseSag + (_isFalling && !_isPlayerFalling ? fallenSlack : 0);
+
+    _drawRopeSegment(canvas, leftHand, knot, leftSag);
+    _drawRopeSegment(canvas, knot, rightHand, rightSag);
+
+    _drawKnot(canvas, knot, tension);
+  }
+
+  /// 한쪽 로프 구간을 2차 베지어로 그린다: 굵은 외곽선 → 밝은 심 → 꼬임 눈금.
+  void _drawRopeSegment(Canvas canvas, Offset a, Offset b, double sag) {
+    // 중점을 sag 만큼 끌어내리도록 제어점 y 를 2*sag 로.
+    final ctrl = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2 + sag * 2);
+    final path = Path()
+      ..moveTo(a.dx, a.dy)
+      ..quadraticBezierTo(ctrl.dx, ctrl.dy, b.dx, b.dy);
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 12
+        ..strokeCap = StrokeCap.round
+        ..color = const Color(0xFF6E4A21),
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8
+        ..strokeCap = StrokeCap.round
+        ..color = const Color(0xFFD8B27C),
+    );
+
+    // 꼬임(twist) 눈금: 곡선을 따라가며 접선에 기울인 짧은 어두운 선.
+    final twist = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = const Color(0xFF9C6B34);
+    const steps = 22;
+    for (int i = 1; i < steps; i++) {
+      final t = i / steps;
+      final p = _quad(a, ctrl, b, t);
+      final tan = _quadTangent(a, ctrl, b, t);
+      final len = tan.distance == 0 ? 1.0 : tan.distance;
+      // 접선을 살짝 회전시킨 방향으로 눈금을 그어 새끼줄 느낌.
+      final nx = (tan.dx * 0.5 - tan.dy) / len;
+      final ny = (tan.dy * 0.5 + tan.dx) / len;
+      canvas.drawLine(
+        Offset(p.dx - nx * 4, p.dy - ny * 4),
+        Offset(p.dx + nx * 4, p.dy + ny * 4),
+        twist,
+      );
+    }
+  }
+
+  /// 가운데 매듭(nut) — 둥근 로프 뭉치(교차로 꼬인 두 가닥) + 위로 세운
+  /// 짧은 깃대에 달린 삼각 표식기. 로프가 느슨할수록 살짝 더 흔들린다.
+  void _drawKnot(Canvas canvas, Offset c, double tension) {
+    canvas.save();
+    canvas.translate(c.dx, c.dy);
+    canvas.rotate(sin(_elapsedSeconds * 3.0) * (0.05 + (1.0 - tension) * 0.05));
+
+    // 그림자
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(0, 6), width: 30, height: 12),
+      Paint()..color = Colors.black.withValues(alpha: 0.22),
+    );
+
+    // 둥근 매듭 덩어리
+    canvas.drawCircle(Offset.zero, 13, Paint()..color = const Color(0xFFB07C3F));
+    canvas.drawCircle(
+      Offset.zero,
+      13,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = const Color(0xFF6E4A21),
+    );
+
+    // X 자로 교차하며 꼬인 두 가닥
+    canvas.drawPath(
+      Path()
+        ..moveTo(-10, -8)
+        ..quadraticBezierTo(0, 0, 10, 8)
+        ..moveTo(-10, 8)
+        ..quadraticBezierTo(0, 0, 10, -8),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round
+        ..color = const Color(0xFF8A5E2E),
+    );
+    canvas.drawArc(
+      Rect.fromCircle(center: const Offset(0, 0), radius: 11),
+      -0.5,
+      1.6,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round
+        ..color = const Color(0xFFC79355),
+    );
+
+    // 중앙 표식 — 위로 세운 짧은 깃대 + 옆으로 나부끼는 삼각기
+    final flap = sin(_elapsedSeconds * 6.0) * 3.0;
+    canvas.drawLine(
+      const Offset(0, -12),
+      const Offset(0, -30),
+      Paint()
+        ..color = const Color(0xFF5C3C1B)
+        ..strokeWidth = 2.5,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, -30)
+        ..lineTo(15 + flap, -25.5)
+        ..lineTo(0, -21)
+        ..close(),
+      Paint()..color = Colors.redAccent,
+    );
+    canvas.restore();
+  }
+
+  /// 2차 베지어 위 점.
+  Offset _quad(Offset p0, Offset c, Offset p1, double t) {
+    final u = 1 - t;
+    return Offset(
+      u * u * p0.dx + 2 * u * t * c.dx + t * t * p1.dx,
+      u * u * p0.dy + 2 * u * t * c.dy + t * t * p1.dy,
+    );
+  }
+
+  /// 2차 베지어 위 접선 벡터(정규화 안 함).
+  Offset _quadTangent(Offset p0, Offset c, Offset p1, double t) {
+    final u = 1 - t;
+    return Offset(
+      2 * u * (c.dx - p0.dx) + 2 * t * (p1.dx - c.dx),
+      2 * u * (c.dy - p0.dy) + 2 * t * (p1.dy - c.dy),
+    );
+  }
+
+  /// 한 파이터(사람/동물)를 그린다. 그림은 항상 오른쪽(로프)을 보도록 그리고
+  /// facing 으로 좌우를 뒤집는다. falling==true면 기존 4단계 낙하 연출
+  /// (비틀거림 → 발 미끄러짐 → 낙하 → 착지/물보라), 아니면 당기는 리듬(heave)에
+  /// 맞춰 몸을 뒤로 젖힌다. effort(0~1)는 "얼마나 지고 있는가" 와 "당기는 힘이
+  /// 얼마나 큰가" 중 큰 값으로, 값이 클수록 더 깊게 젖히고·빠르게 떨고·힘주는
+  /// 표시(동작선/땀/이 악뭄)를 painter 에 넘긴다.
+  void _drawFighter(
+    Canvas canvas, {
+    required Offset center,
+    required int facing, // +1: 오른쪽을 봄, -1: 왼쪽을 봄
+    required bool falling,
+    required double strength,
+    required double cadence,
+    required void Function(Canvas c, double heave, double effort) paint,
+  }) {
+    double dy = 0, lean = 0, scale = 1.0, alpha = 1.0, heave = 0, effort = 0;
+
+    if (falling) {
+      final p = _fallProgress;
+      if (p < 0.2) {
+        lean = sin((p / 0.2) * pi * 6) * 0.35;
+      } else if (p < 0.4) {
+        final t = (p - 0.2) / 0.2;
+        dy = t * 12;
+        lean = 0.3; // 앞(중앙 웅덩이)으로 고꾸라짐
+      } else if (p < 0.8) {
+        final t = (p - 0.4) / 0.4;
+        dy = 12 + t * 96 * 4;
+        scale = 1.0 - t * 0.75;
+        alpha = 1.0 - t * 0.7;
+      } else {
+        alpha = 0;
+      }
+    } else if (_countdown <= 0) {
+      // 짐(로프 위치) 또는 당기는 힘 중 큰 쪽으로 "안간힘" 정도를 정한다.
+      final strengthNorm = (strength / 16.0).clamp(0.0, 1.0);
+      final losing = facing == 1
+          ? (-_ropePosition).clamp(0.0, 1.0) // 플레이어는 ropePosition<0 이면 짐
+          : _ropePosition.clamp(0.0, 1.0); // 동물은 ropePosition>0 이면 짐
+      effort = max(strengthNorm, losing * 0.95);
+
+      final osc = sin(_elapsedSeconds * cadence * (1.0 + effort * 0.6));
+      heave = osc * (1.0 + effort * 1.6);
+      final intensity = 0.05 + effort * 0.16;
+      lean = -intensity * (0.6 + 0.4 * osc); // 로프 반대(뒤)로 젖힘
+      lean += sin(_elapsedSeconds * 38.0) * effort * 0.02; // 안간힘 떨림
+      dy = -osc.abs() * (1.5 + effort * 2.0);
+    }
+
+    if (alpha <= 0) return;
+
+    // 발밑 그림자 (월드 공간, 회전 영향 없음)
+    if (!falling || _fallProgress < 0.4) {
+      canvas.drawOval(
+        Rect.fromCenter(
+            center: Offset(center.dx, center.dy + 48), width: 62, height: 14),
+        Paint()..color = Colors.black.withValues(alpha: 0.20 * alpha),
+      );
     }
 
     canvas.save();
     canvas.translate(center.dx, center.dy + dy);
-    canvas.rotate(angle);
-    canvas.scale(scale);
-    canvas.drawRect(
-      Rect.fromCenter(center: Offset.zero, width: width, height: height),
-      Paint()..color = color.withValues(alpha: alpha.clamp(0.0, 1.0)),
-    );
+    canvas.rotate(lean * facing); // 월드 공간 젖힘 (facing 으로 방향 보정)
+    canvas.scale(facing * scale, scale); // 좌우 반전 + 낙하 축소
+    if (alpha < 1.0) {
+      canvas.saveLayer(
+        const Rect.fromLTRB(-150, -170, 150, 170),
+        Paint()..color = Colors.white.withValues(alpha: alpha.clamp(0.0, 1.0)),
+      );
+      paint(canvas, heave, effort);
+      canvas.restore();
+    } else {
+      paint(canvas, heave, effort);
+    }
     canvas.restore();
+  }
+
+  /// 파이터 팔다리용 둥근 끝 굵은 선.
+  void _fs(Canvas c, Offset a, Offset b, double width, Color color) {
+    c.drawLine(
+      a,
+      b,
+      Paint()
+        ..color = color
+        ..strokeWidth = width
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  /// 힘을 쥐어짜는 표시: 몸 뒤쪽 짧은 동작선 + 튀는 땀방울. effort 0~1.
+  void _strainFx(Canvas c, double effort) {
+    if (effort < 0.15) return;
+    final line = Paint()
+      ..color = Colors.white.withValues(alpha: 0.30 * effort)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    final n = (1 + effort * 3).round();
+    for (int i = 0; i < n; i++) {
+      final y = -26.0 + i * 12.0;
+      final x = -20.0 - (i.isEven ? 4.0 : 0.0);
+      c.drawLine(Offset(x, y), Offset(x - 7 - effort * 5, y - 2), line);
+    }
+    if (effort > 0.4) {
+      final t = (_elapsedSeconds * 3.0) % 1.0;
+      c.drawCircle(
+        Offset(-14 - t * 18, -40 - t * 6 + t * t * 22),
+        2.2,
+        Paint()..color = const Color(0xFFBFE6F5).withValues(alpha: (1 - t) * effort),
+      );
+    }
+  }
+
+  /// 사람(플레이어) — 오른쪽(로프)을 향해 두 팔을 뻗어 버티는 자세.
+  void _paintHuman(Canvas c, double heave, double effort) {
+    final skin =
+        Color.lerp(const Color(0xFFE8B98C), const Color(0xFFD87E63), effort * 0.55)!;
+    const shirt = Color(0xFF2E6BE6);
+    const pants = Color(0xFF39424D);
+    const hair = Color(0xFF3A2A1E);
+
+    _strainFx(c, effort);
+
+    // 다리 — 세게 버틸수록 앞발을 더 앞으로 딛고 무릎을 굽힌다
+    final braceX = 14.0 + effort * 8.0;
+    _fs(c, const Offset(2, 10), const Offset(-15, 28), 11, pants);
+    _fs(c, const Offset(-15, 28), const Offset(-24, 46), 10, pants);
+    _fs(c, const Offset(4, 10), Offset(braceX - 4, 26 + effort * 3), 12, pants);
+    _fs(c, Offset(braceX - 4, 26 + effort * 3), Offset(braceX, 46), 11, pants);
+    c.drawOval(Rect.fromCenter(center: const Offset(-24, 46), width: 18, height: 8),
+        Paint()..color = pants);
+    c.drawOval(Rect.fromCenter(center: Offset(braceX + 2, 46), width: 18, height: 8),
+        Paint()..color = pants);
+
+    // 몸통
+    final torso = Path()
+      ..moveTo(-12, 10)
+      ..lineTo(12, 10)
+      ..lineTo(9, -22)
+      ..lineTo(-13, -22)
+      ..close();
+    c.drawPath(torso, Paint()..color = shirt);
+
+    // 목 + 머리
+    _fs(c, const Offset(-3, -22), const Offset(-3, -30), 8, skin);
+    c.drawCircle(const Offset(-2, -40), 12, Paint()..color = skin);
+    c.drawArc(
+      Rect.fromCircle(center: const Offset(-2, -40), radius: 12),
+      pi * 0.15,
+      pi * 1.2,
+      false,
+      Paint()
+        ..color = hair
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 7
+        ..strokeCap = StrokeCap.round,
+    );
+    c.drawCircle(const Offset(10, -39), 2.2, Paint()..color = skin); // 코
+    if (effort > 0.35) {
+      _fs(c, const Offset(6, -35), const Offset(12, -35), 2, Colors.white70); // 이 악뭄
+    }
+
+    // 팔 — 로프를 잡고 뒤로 당김 (힘줄수록 그립을 몸쪽으로 끌어당김)
+    final ex = heave * 2.0 - effort * 3.0;
+    final grip = Offset(24 + heave * 2.0 - effort * 5.0, -6);
+    _fs(c, const Offset(0, -18), Offset(15 + ex, -13), 9, shirt);
+    _fs(c, Offset(15 + ex, -13), grip, 7, skin);
+    _fs(c, const Offset(-2, -16), Offset(13 + ex, -8), 8, skin);
+    _fs(c, Offset(13 + ex, -8), grip + const Offset(-1, 1), 7, skin);
+    c.drawCircle(grip, 5, Paint()..color = skin);
+  }
+
+  /// 상대 동물 — 종류에 따라 완전히 다른 체형/자세로 그린다.
+  void _paintAnimal(Canvas c, double heave, double effort) {
+    switch (_currentAnimal) {
+      case AnimalType.chimpanzee:
+        _paintChimp(c, heave, effort);
+      case AnimalType.orangutan:
+        _paintOrangutan(c, heave, effort);
+      case AnimalType.gorilla:
+        _paintGorilla(c, heave, effort);
+    }
+  }
+
+  /// 침팬지 — 작고 웅크린 체형, 긴 팔, 큰 귀. 빠르고 불규칙하게 당긴다.
+  void _paintChimp(Canvas c, double heave, double effort) {
+    const fur = Color(0xFF2C2420);
+    final skin =
+        Color.lerp(const Color(0xFFC7A184), const Color(0xFFB86A55), effort * 0.5)!;
+    final j = heave * 4.0 + sin(_elapsedSeconds * 20.0) * effort * 2.0 - effort * 4.0;
+
+    _strainFx(c, effort);
+
+    // 웅크린 다리
+    _fs(c, const Offset(-2, 16), const Offset(-14, 30), 10, fur);
+    _fs(c, const Offset(-14, 30), const Offset(-16, 46), 9, fur);
+    _fs(c, const Offset(4, 16), const Offset(6, 32), 10, fur);
+    _fs(c, const Offset(6, 32), const Offset(2, 46), 9, fur);
+    c.drawOval(Rect.fromCenter(center: const Offset(-16, 46), width: 16, height: 7),
+        Paint()..color = fur);
+    c.drawOval(Rect.fromCenter(center: const Offset(3, 46), width: 16, height: 7),
+        Paint()..color = fur);
+
+    // 앞으로 숙인 몸통
+    final torso = Path()
+      ..moveTo(-14, 16)
+      ..lineTo(8, 18)
+      ..lineTo(12, -10)
+      ..lineTo(-8, -14)
+      ..close();
+    c.drawPath(torso, Paint()..color = fur);
+
+    // 긴 팔 — 로프까지 멀리 뻗음
+    final grip = Offset(26 + j, -6);
+    _fs(c, const Offset(-4, -8), Offset(16 + j, 2), 9, fur);
+    _fs(c, Offset(16 + j, 2), grip, 8, fur);
+    _fs(c, const Offset(-6, -6), Offset(14 + j, 8), 8, fur);
+    _fs(c, Offset(14 + j, 8), Offset(24 + j, -3), 7, fur);
+    c.drawCircle(grip, 5, Paint()..color = skin);
+
+    // 머리 — 낮고 앞으로, 큰 귀
+    c.drawCircle(const Offset(2, -16), 6.5, Paint()..color = fur);
+    c.drawCircle(const Offset(16, -12), 6.5, Paint()..color = fur);
+    c.drawCircle(const Offset(9, -15), 10, Paint()..color = fur);
+    c.drawOval(Rect.fromCenter(center: const Offset(12, -12), width: 12, height: 14),
+        Paint()..color = skin);
+    c.drawCircle(const Offset(10, -15), 1.6, Paint()..color = fur);
+    c.drawCircle(const Offset(15, -14), 1.6, Paint()..color = fur);
+    if (effort > 0.35) {
+      _fs(c, const Offset(9, -8), const Offset(16, -8), 2, Colors.white70); // 드러낸 이
+    }
+  }
+
+  /// 오랑우탄 — 크고 둥근 체형, 텁수룩한 붉은 털, 아주 긴 팔, 볼 주머니.
+  /// 느리지만 꾸준히 당긴다.
+  void _paintOrangutan(Canvas c, double heave, double effort) {
+    const fur = Color(0xFF9C4A1E);
+    const dark = Color(0xFF5E2F13);
+    const skin = Color(0xFF7A4A34);
+    final f = heave * 3.0 - effort * 5.0;
+
+    _strainFx(c, effort);
+
+    // 짧게 접힌 다리
+    _fs(c, const Offset(-8, 20), const Offset(-16, 44), 13, fur);
+    _fs(c, const Offset(8, 20), const Offset(12, 44), 13, fur);
+    c.drawOval(Rect.fromCenter(center: const Offset(-16, 46), width: 18, height: 8),
+        Paint()..color = dark);
+    c.drawOval(Rect.fromCenter(center: const Offset(12, 46), width: 18, height: 8),
+        Paint()..color = dark);
+
+    // 크고 둥근 몸통 + 털 프린지
+    final belly = Rect.fromCenter(center: const Offset(-1, 6), width: 42, height: 48);
+    _furFringe(c, belly, fur, 26);
+    c.drawOval(belly, Paint()..color = fur);
+    c.drawOval(Rect.fromCenter(center: const Offset(0, 10), width: 24, height: 28),
+        Paint()..color = dark.withValues(alpha: 0.35));
+
+    // 아주 긴 팔
+    final grip = Offset(30 + f, -6);
+    _fs(c, const Offset(-8, -14), Offset(18 + f, 2), 13, fur);
+    _fs(c, Offset(18 + f, 2), grip, 11, fur);
+    _fs(c, const Offset(-10, -10), Offset(16 + f, 10), 11, fur);
+    _fs(c, Offset(16 + f, 10), Offset(27 + f, -2), 9, fur);
+    c.drawCircle(grip, 6, Paint()..color = skin);
+
+    // 넓은 얼굴 (볼 주머니 플랜지)
+    c.drawOval(Rect.fromCenter(center: const Offset(2, -28), width: 34, height: 24),
+        Paint()..color = dark);
+    c.drawCircle(const Offset(4, -28), 11, Paint()..color = fur);
+    c.drawOval(Rect.fromCenter(center: const Offset(6, -26), width: 12, height: 15),
+        Paint()..color = skin);
+    c.drawCircle(const Offset(3, -28), 1.6, Paint()..color = dark);
+    c.drawCircle(const Offset(9, -27), 1.6, Paint()..color = dark);
+    _fs(c, const Offset(0, -18), const Offset(-2, -10), 6, fur); // 턱수염
+  }
+
+  /// 고릴라 — 거대한 어깨와 팔, 검은 털, 작은 볏 달린 머리, 은색 등판.
+  /// 평소 버티다 가끔 폭발적으로 당긴다.
+  void _paintGorilla(Canvas c, double heave, double effort) {
+    const fur = Color(0xFF211D1D);
+    const chest = Color(0xFF3A3535);
+    const silver = Color(0xFF6E6E6E);
+    const skin = Color(0xFF2A2424);
+    final burst = (sin(_elapsedSeconds * 0.3) > 0.8) ? 5.0 : 0.0;
+    final f = heave * 1.5 + burst - effort * 5.0;
+
+    _strainFx(c, effort);
+
+    // 짧고 굵은 다리
+    _fs(c, const Offset(-8, 16), const Offset(-16, 44), 17, fur);
+    _fs(c, const Offset(10, 16), const Offset(12, 44), 17, fur);
+    c.drawOval(Rect.fromCenter(center: const Offset(-16, 47), width: 22, height: 9),
+        Paint()..color = fur);
+    c.drawOval(Rect.fromCenter(center: const Offset(12, 47), width: 22, height: 9),
+        Paint()..color = fur);
+
+    // 몸통 + 은색 등판 + 가슴
+    final trunk = Path()
+      ..moveTo(-18, 20)
+      ..lineTo(16, 20)
+      ..lineTo(20, -14)
+      ..lineTo(-22, -18)
+      ..close();
+    c.drawPath(trunk, Paint()..color = fur);
+    c.drawRRect(
+      RRect.fromRectAndRadius(
+          const Rect.fromLTWH(-22, -14, 16, 32), const Radius.circular(6)),
+      Paint()..color = silver,
+    );
+    c.drawOval(
+        Rect.fromCenter(
+            center: const Offset(4, 2), width: 22 + effort * 4, height: 26),
+        Paint()..color = chest);
+
+    // 거대한 어깨 + 팔
+    c.drawCircle(const Offset(-2, -14), 13, Paint()..color = fur);
+    final grip = Offset(28 + f, -4);
+    _fs(c, const Offset(0, -14), Offset(20 + f, 2), 17, fur);
+    _fs(c, Offset(20 + f, 2), grip, 15, fur);
+    _fs(c, const Offset(-4, -10), Offset(17 + f, 12), 14, fur);
+    _fs(c, Offset(17 + f, 12), Offset(26 + f, 2), 12, fur);
+    c.drawCircle(grip, 8, Paint()..color = skin); // 주먹
+
+    // 작은 머리 (어깨 사이) + 볏 + 눈두덩
+    c.drawCircle(const Offset(8, -22), 9, Paint()..color = fur);
+    final crest = Path()
+      ..moveTo(2, -28)
+      ..lineTo(8, -34)
+      ..lineTo(13, -27)
+      ..close();
+    c.drawPath(crest, Paint()..color = fur);
+    _fs(c, const Offset(3, -24), const Offset(14, -22), 4, chest);
+    c.drawCircle(const Offset(11, -20), 3, Paint()..color = skin);
+  }
+
+  /// 둥근 몸통 둘레에 짧은 털 프린지를 그려 텁수룩하게 보이게 한다.
+  void _furFringe(Canvas c, Rect r, Color color, int n) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    for (int i = 0; i < n; i++) {
+      final a = i / n * 2 * pi;
+      final ox = r.center.dx + cos(a) * r.width / 2;
+      final oy = r.center.dy + sin(a) * r.height / 2;
+      c.drawLine(Offset(ox, oy), Offset(ox + cos(a) * 7, oy + sin(a) * 7), p);
+    }
   }
 
   void _drawFallParticles(Canvas canvas) {
