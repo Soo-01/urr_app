@@ -247,6 +247,7 @@ class _GameSetupScreenState extends State<_GameSetupScreen> {
   int _difficulty = 1;
   int _duration = 60;
   BrunnstromStage _brunnstrom = BrunnstromStage.stage4;
+  TugMode _tugMode = TugMode.cycle; // 줄다리기 전용: 힘 생성 방식
   CognitiveLevel _cognitive = CognitiveLevel.rich;
   String? _neglect;
   late String _joint;
@@ -346,6 +347,39 @@ class _GameSetupScreenState extends State<_GameSetupScreen> {
                   .toList()),
 
           const SizedBox(height: 20),
+          // 줄다리기 전용: 힘 생성 방식 (반복 당기기 / 버티기)
+          if (widget.gameId == 'tug_of_war') ...[
+            Text(isKoreanLocale(loc) ? '줄다리기 방식' : 'Tug of War mode',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 6, children: [
+              ChoiceChip(
+                label:
+                    Text(isKoreanLocale(loc) ? '반복 당기기' : 'Repeated pull'),
+                selected: _tugMode == TugMode.cycle,
+                onSelected: (_) => setState(() => _tugMode = TugMode.cycle),
+              ),
+              ChoiceChip(
+                label: Text(
+                    isKoreanLocale(loc) ? '버티기 (자세 유지)' : 'Hold (isometric)'),
+                selected: _tugMode == TugMode.hold,
+                onSelected: (_) => setState(() => _tugMode = TugMode.hold),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            Text(
+              isKoreanLocale(loc)
+                  ? (_tugMode == TugMode.cycle
+                      ? '팔꿈치를 굽혔다 펴는 동작을 반복해 로프를 당깁니다.'
+                      : '굽힌 자세를 계속 유지해 로프를 버팁니다. 힘을 빼면 밀려납니다.')
+                  : (_tugMode == TugMode.cycle
+                      ? 'Pull by repeatedly flexing and extending the elbow.'
+                      : 'Hold a flexed posture to resist; relax and you get dragged off.'),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 20),
+          ],
           // 인지 레벨
           Text(loc.selectPart,
               style:
@@ -626,7 +660,9 @@ class _GameSetupScreenState extends State<_GameSetupScreen> {
             bluetoothService: widget.bluetoothService, config: config);
       case 'tug_of_war':
         screen = TugOfWarGame(
-            bluetoothService: widget.bluetoothService, config: config);
+            bluetoothService: widget.bluetoothService,
+            config: config,
+            mode: _tugMode);
       default:
         return;
     }
