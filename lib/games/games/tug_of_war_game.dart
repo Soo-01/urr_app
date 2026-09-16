@@ -125,14 +125,24 @@ class TugOfWarFlameGame extends FlameGame {
   double _ropePosition = 0.0;
 
   int _pullCount = 0;
-  double _elapsedSeconds = 0;
+  double _elapsedSeconds = 0; // 현재 라운드 경과 시간 (라운드마다 0으로 리셋)
+  double _matchElapsedSeconds = 0; // 전체 경기 경과 시간 (결과 화면용, 리셋 안 됨)
 
   // ── HUD / 난이도 연동 (step 7·8) ────────────────────────────────────────
-  /// 제한 시간(초). 0이면 무제한. onLoad()에서 config.gameDuration으로 설정.
+  /// 라운드당 제한 시간(초). 0이면 무제한. onLoad()에서 config.gameDuration으로 설정
+  /// (docs/tug_of_war_build_guide.md 6번 "라운드 시간" 참고).
   double _timeLimit = 0;
   /// difficultyLevel(1~5) 파생 미세 보정 — 높을수록 상대는 세고 내 힘은 덜 붙는다.
   double _aiStrengthMul = 1.0;
   double _playerPowerMul = 1.0;
+
+  // ── 라운드 시스템: 3전 2선승 (docs/tug_of_war_build_guide.md §2, §10 Phase 4) ─
+  static const int _totalRounds = 3;
+  int _currentRound = 1; // 1-base, 진행 중인 라운드
+  int _playerRoundWins = 0;
+  int _animalRoundWins = 0;
+  /// 라운드별 결과 (null=아직 안 함, true=플레이어 승, false=상대 승).
+  final List<bool?> _roundResults = List<bool?>.filled(_totalRounds, null);
 
   // ── 시작 카운트다운 ──────────────────────────────────────────────────────
   // 카운트다운 중에는 AI도 당기지 않고 로프도 움직이지 않는다. 이게 없으면
@@ -229,6 +239,7 @@ class TugOfWarFlameGame extends FlameGame {
     }
 
     _elapsedSeconds += dt;
+    _matchElapsedSeconds += dt;
     if (_mode == TugMode.hold) {
       _detectHold(dt);
     } else {
@@ -257,7 +268,6 @@ class TugOfWarFlameGame extends FlameGame {
     _resultWin = !isPlayerFalling;
     _resultFlash = 1.0;
     _addShake(10);
-    if (_resultWin) _spawnConfetti();
     onFallTriggered?.call();
   }
 
@@ -278,8 +288,59 @@ class TugOfWarFlameGame extends FlameGame {
     }
 
     if (_fallProgress >= 1.0) {
-      _endGame(won: !_isPlayerFalling);
+      _resolveRoundEnd();
     }
+  }
+
+  /// 한 라운드가 끝났을 때 호출: 결과를 기록하고, 3전 2선승이 결정 났으면 경기를
+  /// 종료하고, 아니면 다음 라운드를 준비한다.
+  /// (docs/tug_of_war_build_guide.md §2 `_totalRounds`, §10 Phase 4 라운드 시스템)
+  void _resolveRoundEnd() {
+    final roundWon = !_isPlayerFalling;
+    _roundResults[_currentRound - 1] = roundWon;
+    if (roundWon) {
+      _playerRoundWins++;
+    } else {
+      _animalRoundWins++;
+    }
+
+    final matchOver = _playerRoundWins >= 2 ||
+        _animalRoundWins >= 2 ||
+        _currentRound >= _totalRounds;
+
+    if (matchOver) {
+      final matchWon = _playerRoundWins > _animalRoundWins;
+      if (matchWon) _spawnConfetti(); // 최종 승리 색종이 (라운드 승리와 구분)
+      _endGame(won: matchWon);
+    } else {
+      _startNextRound();
+    }
+  }
+
+  /// 다음 라운드 준비: 로프·힘·낙하·이펙트 상태만 초기화한다. 동물 종류
+  /// (Brunnstrom 단계로 이미 정해짐)와 누적 반복 횟수(_pullCount) 등 경기
+  /// 전체 통계는 그대로 유지한다.
+  void _startNextRound() {
+    _currentRound++;
+    _isFalling = false;
+    _isPlayerFalling = false;
+    _fallProgress = 0.0;
+    _ropePosition = 0.0;
+    _pullPower = 0;
+    _isPulling = false;
+    _elapsedSeconds = 0; // 라운드별 제한 시간 리셋
+    _countdown = 3.0;
+    _particles.clear();
+    _shake = 0;
+    _resultFlash = 0;
+    _fxPuffTimer = 0;
+
+    // _aiPower/_ropePosition 관련 표시(HUD 게이지·상대 힘 수치, 모터 저항)가
+    // 직전 라운드가 끝나던 순간의 극단적인 값을 그대로 보여주지 않도록, 이미
+    // 리셋된 상태(_ropePosition=0, _elapsedSeconds=0)로 즉시 다시 계산한다.
+    // (그렇지 않으면 다음 _updateAnimalAi() 호출 전까지 카운트다운 내내
+    //  이전 라운드의 마지막 힘 수치가 화면/모터에 남아 "리셋 안 됨"으로 보임.)
+    _updateAnimalAi();
   }
 
   void _addShake(double amt) => _shake = min(30.0, _shake + amt);
@@ -520,9 +581,9 @@ class TugOfWarFlameGame extends FlameGame {
       );
     }
 
-    // 배경: 정글 협곡 + 아래 강, 좌우 절벽, 그 사이를 잇는 밧줄 다리.
+    // 배경: 정글 협곡 + 아래 강, 좌우 절벽. (원장님 지시로 다리는 제거 —
+    // 강에 빠지는 낙하 연출은 그대로 유지하고, 흔들리는 다리로 인한 긴장감만 없앤다.)
     _drawCanyon(canvas, w, h);
-    _drawBridge(canvas, w, h);
 
     // 실제로 늘어지는 로프 + 가운데 매듭(nut). 매듭은 로프 위치에 따라 좌우로
     // 이동하고, 당기는 힘이 셀수록 로프가 팽팽해지며(처짐 감소) 미세하게 떨린다.
@@ -587,6 +648,19 @@ class TugOfWarFlameGame extends FlameGame {
           shadows: [Shadow(color: Colors.black, blurRadius: 10)],
         ),
       ).render(canvas, '$n', Vector2(w / 2, h / 2), anchor: Anchor.center);
+
+      // 2라운드부터는 새 라운드가 시작됨을 알려준다 (per-round reset 안내).
+      if (_currentRound > 1) {
+        TextPaint(
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+          ),
+        ).render(canvas, '라운드 $_currentRound / $_totalRounds',
+            Vector2(w / 2, h / 2 + 70), anchor: Anchor.center);
+      }
     }
   }
 
@@ -596,9 +670,12 @@ class TugOfWarFlameGame extends FlameGame {
   void _drawHud(Canvas canvas, double w, double h) {
     final cog = config.cognitiveLevel;
 
+    // 라운드 표시 (●○○) — 3전 2선승 진행 상황. 핵심 정보라 인지 레벨과 무관하게 항상 표시.
+    _drawRoundDots(canvas, w);
+
     // 우세 게이지
     final gaugeW = w * 0.58, gaugeH = 14.0;
-    final gx = (w - gaugeW) / 2, gy = 20.0;
+    final gx = (w - gaugeW) / 2, gy = 34.0;
     final cx = gx + gaugeW / 2;
     final track = RRect.fromRectAndRadius(
         Rect.fromLTWH(gx, gy, gaugeW, gaugeH), const Radius.circular(7));
@@ -690,6 +767,30 @@ class TugOfWarFlameGame extends FlameGame {
     }
   }
 
+  /// 라운드 진행 표시 (●○○): 끝난 라운드는 승패 색으로 채우고, 남은 라운드는
+  /// 빈 원으로 둔다. (docs/tug_of_war_build_guide.md §12 "라운드 (●○○)")
+  void _drawRoundDots(Canvas canvas, double w) {
+    const r = 5.0, gap = 16.0;
+    const totalW = (_totalRounds - 1) * gap;
+    final startX = w / 2 - totalW / 2;
+    for (int i = 0; i < _totalRounds; i++) {
+      final result = _roundResults[i];
+      final color = result == null
+          ? Colors.white24
+          : (result ? Colors.lightBlueAccent : Colors.deepOrangeAccent);
+      final c = Offset(startX + i * gap, 9);
+      canvas.drawCircle(c, r, Paint()..color = color);
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = Colors.white38,
+      );
+    }
+  }
+
   String _animalName() => switch (_currentAnimal) {
         AnimalType.chimpanzee => '침팬지',
         AnimalType.orangutan => '오랑우탄',
@@ -726,37 +827,34 @@ class TugOfWarFlameGame extends FlameGame {
 
   // ── 캐릭터 위치 (지는 쪽이 상대에게 끌려간다) ────────────────────────────
   // 실제 줄다리기처럼 로프가 팽팽한 채로, 이기는 쪽이 로프를 감아 당기면 지는
-  // 쪽 사람이 통째로 중앙(물웅덩이)으로 끌려온다. _ropePosition +1 = 플레이어
-  // 우세(상대가 끌려옴), -1 = 플레이어 열세(플레이어가 끌려옴).
-  // 낙하 연출 중에는 계속 중앙 쪽으로 미끄러지며 떨어진다.
+  // 쪽 사람이 중앙 쪽 한계선(_dragLimitL/R)까지 끌려온다. _ropePosition +1 =
+  // 플레이어 우세(상대가 끌려옴), -1 = 플레이어 열세(플레이어가 끌려옴).
+  // (원장님 지시로 다리에 이어 땅 사이 틈도 없애 긴장감을 더 낮췄다 — 평소엔
+  // 눈에 보이는 낭떠러지 없이 하나로 이어진 땅 위에 서 있고, 이 한계선을
+  // 넘어야만 비로소 낙하가 시작된다. 낙하 연출 중에만 계속 중앙 쪽으로
+  // 미끄러지며 땅 끝 너머 강으로 떨어진다.)
   double _playerCenterX(double w) {
     final dragged = (_ropePosition < 0 ? -_ropePosition : 0.0); // 0~1
-    var x = w * 0.15 + dragged * (w * 0.24); // 절벽 끝 -> 다리 가운데로 끌려옴
+    var x = w * 0.15 + dragged * (w * _dragLimitL - w * 0.15); // 최대치=한계선
     if (_isFalling && _isPlayerFalling) x += _fallProgress * (w * 0.09);
     return x;
   }
 
   double _opponentCenterX(double w) {
     final dragged = (_ropePosition > 0 ? _ropePosition : 0.0);
-    var x = w * 0.85 - dragged * (w * 0.24);
+    var x = w * 0.85 - dragged * (w * 0.85 - w * _dragLimitR);
     if (_isFalling && !_isPlayerFalling) x -= _fallProgress * (w * 0.09);
     return x;
   }
 
-  // ── 협곡 지형: 서 있는 지점의 Y (절벽 위는 평평, 다리 위는 가운데가 처짐) ──
-  static const double _bridgeLeft = 0.30; // w 비율
-  static const double _bridgeRight = 0.70;
+  // 지는 쪽이 낙하 전까지 최대로 끌려올 수 있는 중앙 쪽 한계선 (w 비율).
+  // 다리·틈이 없어진 뒤로는 시각적 경계가 아니라 순전히 게임플레이용 값이다.
+  static const double _dragLimitL = 0.30;
+  static const double _dragLimitR = 0.70;
 
-  double _standY(double x, double w, double h) {
-    final xL = w * _bridgeLeft, xR = w * _bridgeRight;
-    final topY = h * 0.63;
-    if (x <= xL || x >= xR) return topY; // 절벽 위
-    final span = xR - xL;
-    final s = 4 * (x - xL) * (xR - x) / (span * span); // 0~1 (가운데 최대)
-    return topY + 20 * s; // 다리 처짐
-  }
+  double _standY(double x, double w, double h) => h * 0.63;
 
-  // ── 배경: 정글 협곡 + 아래 강 + 좌우 절벽 ────────────────────────────────
+  // ── 배경: 정글 + 강 + 이어진 땅 ──────────────────────────────────────────
   // 인지 레벨(bgComplexity 0/1/2)에 따라 장식 요소를 단계적으로 줄인다.
   void _drawCanyon(Canvas canvas, double w, double h) {
     final detail = config.cognitiveLevel.bgComplexity; // 0=단순 ~ 2=풍부
@@ -819,66 +917,57 @@ class TugOfWarFlameGame extends FlameGame {
       }
     }
 
-    _drawCliff(canvas, w, h, left: true, detail: detail);
-    _drawCliff(canvas, w, h, left: false, detail: detail);
+    _drawGround(canvas, w, h, detail: detail);
   }
 
-  void _drawCliff(Canvas canvas, double w, double h,
-      {required bool left, int detail = 2}) {
+  /// 하나로 이어진 지면 — 이전에는 좌우 절벽 사이에 강이 보이는 틈이 있었지만,
+  /// 원장님 지시로 그 틈을 없애 화면 전체 너비를 잇는 하나의 땅으로 만들었다.
+  /// 강은 이 땅 아래(리버 라인부터 화면 끝까지)를 따라 그대로 흐른다 — 지는
+  /// 쪽은 여전히 중앙으로 끌려오다 땅 끝 너머로 떨어져 강에 빠지며(낙하 연출·
+  /// 물보라 그대로 유지), 다만 평소에는 눈에 보이는 '틈'이 없어 덜 위협적이다.
+  void _drawGround(Canvas canvas, double w, double h, {required int detail}) {
     final topY = h * 0.63;
-    final edgeX = left ? w * _bridgeLeft : w * _bridgeRight;
-    final outX = left ? -2.0 : w + 2;
-    final dir = left ? 1.0 : -1.0;
-    const steps = 7;
+    final riverTop = h * 0.85;
 
-    // 바위 덩어리 (안쪽 가장자리 지그재그)
-    final rock = Path()..moveTo(outX, topY - 6);
-    for (int i = 0; i <= steps; i++) {
-      final t = i / steps;
-      final y = topY + t * (h - topY + 4);
-      final jag = (i.isEven ? 12.0 : -4.0) * dir + sin(i * 2.0) * 4 * dir;
-      rock.lineTo(edgeX + jag, y);
-    }
-    rock
-      ..lineTo(outX, h + 2)
-      ..close();
-    canvas.drawPath(rock, Paint()..color = const Color(0xFF3B322A));
-    canvas.drawPath(
+    // 땅(바위) — 풀밭 아래부터 강 수면 위까지, 화면 전체 너비.
+    final rock = Rect.fromLTWH(0, topY - 6, w, riverTop - (topY - 6));
+    canvas.drawRect(rock, Paint()..color = const Color(0xFF3B322A));
+    canvas.drawRect(
       rock,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 6
+        ..strokeWidth = 4
         ..color = const Color(0xFF2A231D),
     );
 
     // 풀 덮인 윗면
-    final lipX = left ? 0.0 : edgeX;
-    final lipW = left ? edgeX : w - edgeX;
-    canvas.drawRect(Rect.fromLTWH(lipX, topY - 6, lipW, 12),
+    canvas.drawRect(Rect.fromLTWH(0, topY - 6, w, 12),
         Paint()..color = const Color(0xFF497A3C));
-    canvas.drawRect(Rect.fromLTWH(lipX, topY - 6, lipW, 4),
+    canvas.drawRect(Rect.fromLTWH(0, topY - 6, w, 4),
         Paint()..color = const Color(0xFF5FA04D));
+
     if (detail >= 1) {
       final blade = Paint()
         ..color = const Color(0xFF5FA04D)
         ..strokeWidth = 2
         ..strokeCap = StrokeCap.round;
-      for (int i = 0; i < 4; i++) {
-        final bx = edgeX + dir * (2.0 + i * 5);
-        canvas.drawLine(Offset(bx, topY - 2),
-            Offset(bx + dir * 3, topY + 8 + i * 2.0), blade);
+      for (int i = 0; i < 16; i++) {
+        final bx = w * (i + 0.5) / 16;
+        final lean = (i.isEven ? 1 : -1) * 3.0;
+        canvas.drawLine(
+            Offset(bx, topY - 2), Offset(bx + lean, topY + 7), blade);
       }
     }
 
-    // 매달린 덩굴 (풍부 레벨에서만)
+    // 강가로 늘어진 덩굴 (풍부 레벨에서만)
     if (detail >= 2) {
       final vine = Paint()
         ..color = const Color(0xFF3C6B3A)
         ..strokeWidth = 2.5
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
-      for (int i = 0; i < 3; i++) {
-        final vx = edgeX + dir * (6.0 + i * 12);
+      for (int i = 0; i < 5; i++) {
+        final vx = w * (i + 1) / 6;
         final sway = sin(_elapsedSeconds * 1.2 + i) * 4;
         canvas.drawPath(
           Path()
@@ -891,69 +980,6 @@ class TugOfWarFlameGame extends FlameGame {
             Paint()..color = const Color(0xFF4C7A3E));
       }
     }
-  }
-
-  // ── 밧줄 다리 (좌우 절벽을 잇는 발판; 가운데가 처진다) ──────────────────
-  void _drawBridge(Canvas canvas, double w, double h) {
-    final xL = w * _bridgeLeft, xR = w * _bridgeRight;
-    final anchorY = h * 0.63;
-    Offset deck(double x) => Offset(x, _standY(x, w, h) + 2);
-    Offset rail(double x) => Offset(x, _standY(x, w, h) - 34);
-
-    Path curve(Offset Function(double) f) {
-      final p = Path()..moveTo(f(xL).dx, f(xL).dy);
-      for (double x = xL; x <= xR; x += 10) {
-        final o = f(x);
-        p.lineTo(o.dx, o.dy);
-      }
-      p.lineTo(f(xR).dx, f(xR).dy);
-      return p;
-    }
-
-    // 절벽에 박힌 기둥
-    final post = Paint()..color = const Color(0xFF5A3F26);
-    canvas.drawRect(
-        Rect.fromCenter(center: Offset(xL, anchorY - 4), width: 8, height: 44),
-        post);
-    canvas.drawRect(
-        Rect.fromCenter(center: Offset(xR, anchorY - 4), width: 8, height: 44),
-        post);
-
-    // 세로 널빤지
-    final plankFill = Paint()..color = const Color(0xFF6B4A2C);
-    final plankEdge = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..color = const Color(0xFF4A3016);
-    for (double x = xL + 8; x <= xR - 8; x += 14) {
-      final d = deck(x);
-      final slope = (deck(x + 6).dy - deck(x - 6).dy) / 12;
-      canvas.save();
-      canvas.translate(d.dx, d.dy);
-      canvas.rotate(atan(slope));
-      final r = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset.zero, width: 11, height: 15),
-        const Radius.circular(2),
-      );
-      canvas.drawRRect(r, plankFill);
-      canvas.drawRRect(r, plankEdge);
-      canvas.restore();
-    }
-
-    // 손잡이 밧줄 + 발판 밧줄 + 매다는 줄
-    final ropePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFF7A5A34);
-    final hang = Paint()
-      ..color = const Color(0xFF7A5A34)
-      ..strokeWidth = 2;
-    for (double x = xL + 6; x <= xR - 6; x += 26) {
-      canvas.drawLine(rail(x), deck(x), hang);
-    }
-    canvas.drawPath(curve(deck), ropePaint);
-    canvas.drawPath(curve(rail), ropePaint);
   }
 
   // ── 로프 렌더 ────────────────────────────────────────────────────────────
@@ -1525,22 +1551,23 @@ class TugOfWarFlameGame extends FlameGame {
     isRunning = false;
     _sub?.cancel();
 
-    // 점수: 반복/버티기로 쌓은 노력(_pullCount) + 승리 보너스, 100점 상한.
-    final score = (_pullCount * 8 + (won ? 40 : 0)).clamp(0, 100);
+    // 점수: 반복/버티기로 쌓은 노력(_pullCount) + 이긴 라운드 수 보너스, 100점 상한.
+    final score =
+        (_pullCount * 6 + _playerRoundWins * 20).clamp(0, 100);
 
     final result = GameResult(
       gameId: 'tug_of_war',
       score: score,
       maxPossibleScore: 100,
       accuracy: won ? 1.0 : 0.0,
-      duration: Duration(milliseconds: (_elapsedSeconds * 1000).round()),
+      duration: Duration(milliseconds: (_matchElapsedSeconds * 1000).round()),
       difficultyLevel: config.difficultyLevel,
       bodyPart: config.bodyPart,
       timestamp: DateTime.now(),
       calibrationMin: config.normalizer.minAngle,
       calibrationMax: config.normalizer.maxAngle,
       hits: _pullCount,
-      misses: 0,
+      misses: _animalRoundWins,
     );
     onGameEnd(result);
   }
