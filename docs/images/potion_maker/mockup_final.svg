@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" width="1600" height="900" font-family="sans-serif">
+  <!-- [E3] 물약 제조 최종 목업: 배치 C(유리 플라스크 층 쌓기) + 분위기 B(밝은 동화 실험실)
+       상황: 작은 병을 붓는 중, 레버 70% 열림, 목표선 = 현재 층의 0.5 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff7e6"/><stop offset="1" stop-color="#ffe2b0"/></linearGradient>
+    <clipPath id="flask"><circle cx="800" cy="620" r="204"/></clipPath>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <!-- 창문 -->
+  <path d="M 1060 520 L 1060 330 Q 1150 250 1240 330 L 1240 520 Z" fill="#bfe6ff" stroke="#3b2a1a" stroke-width="6"/>
+  <line x1="1150" y1="290" x2="1150" y2="520" stroke="#3b2a1a" stroke-width="5"/>
+  <!-- 바닥 -->
+  <rect y="850" width="1600" height="50" fill="#c68b59" stroke="#3b2a1a" stroke-width="6"/>
+  <!-- HUD -->
+  <text x="40" y="75" font-size="46" fill="#3b2a1a" font-weight="bold">물약 2/6</text>
+  <text x="265" y="75" font-size="46" fill="#ffb300" stroke="#3b2a1a" stroke-width="2">★ 5</text>
+  <!-- 레시피 -->
+  <rect x="1290" y="30" width="280" height="200" rx="16" fill="#ffffff" stroke="#3b2a1a" stroke-width="6"/>
+  <text x="1310" y="80" font-size="30" fill="#3b2a1a" font-weight="bold">레시피</text>
+  <text x="1310" y="125" font-size="28" fill="#1e88e5">● 큰 통 ✔</text>
+  <text x="1310" y="165" font-size="28" fill="#8e24aa" font-weight="bold">● 작은 병 ◀</text>
+  <text x="1310" y="205" font-size="28" fill="#43a047">● 큰 통</text>
+  <!-- 선반 + 성공 생물 -->
+  <rect x="40" y="540" width="330" height="20" fill="#c68b59" stroke="#3b2a1a" stroke-width="5"/>
+  <circle cx="115" cy="503" r="34" fill="#ffc107" stroke="#3b2a1a" stroke-width="5"/><circle cx="105" cy="496" r="6" fill="#3b2a1a"/><circle cx="127" cy="496" r="6" fill="#3b2a1a"/>
+  <path d="M 93 473 L 100 455 L 108 468 L 115 450 L 122 468 L 130 455 L 137 473 Z" fill="#ffb300" stroke="#3b2a1a" stroke-width="3"/>
+  <circle cx="210" cy="503" r="34" fill="#f06292" stroke="#3b2a1a" stroke-width="5"/><circle cx="200" cy="496" r="6" fill="#3b2a1a"/><circle cx="222" cy="496" r="6" fill="#3b2a1a"/>
+  <text x="40" y="600" font-size="24" fill="#6d4c41">성공한 생물 선반 (황금 · 반짝)</text>
+  <!-- 재료통(작은 병) -->
+  <rect x="720" y="40" width="160" height="150" rx="28" fill="#ffffff" fill-opacity="0.6" stroke="#3b2a1a" stroke-width="6"/>
+  <rect x="731" y="105" width="138" height="74" rx="18" fill="#8e24aa"/>
+  <!-- 꼭지 + 레버 (3/4 뷰, 가쪽돌림 = 화면 왼쪽) -->
+  <rect x="788" y="190" width="24" height="26" fill="#b0bec5" stroke="#3b2a1a" stroke-width="4"/>
+  <path d="M 910 225 A 110 34 0 0 1 897.7 240.3" fill="none" stroke="#9e9e9e" stroke-width="14"/>
+  <path d="M 897.7 240.3 A 110 34 0 0 1 711.2 245.1" fill="none" stroke="#1e88e5" stroke-width="14"/>
+  <path d="M 711.2 245.1 A 110 34 0 0 1 690 225" fill="none" stroke="#ffb300" stroke-width="14"/>
+  <line x1="800" y1="225" x2="735.3" y2="252.5" stroke="#3b2a1a" stroke-width="21" stroke-linecap="round"/>
+  <line x1="800" y1="225" x2="735.3" y2="252.5" stroke="#ffcc80" stroke-width="13" stroke-linecap="round"/>
+  <circle cx="735.3" cy="252.5" r="14" fill="#ffb74d" stroke="#3b2a1a" stroke-width="4"/>
+  <text x="575" y="222" font-size="26" fill="#3b2a1a" font-weight="bold">← 열림</text>
+  <text x="918" y="222" font-size="22" fill="#757575">닫힘</text>
+  <!-- 흐름 -->
+  <rect x="793" y="262" width="14" height="380" fill="#8e24aa"/>
+  <!-- 플라스크 안 층: 끝난 층(얇게) + 지금 층(0.6H 칸) + 허용 오차 띠 -->
+  <g clip-path="url(#flask)">
+    <rect x="590" y="790" width="420" height="50" fill="#1e88e5"/>
+    <line x1="590" y1="790" x2="1010" y2="790" stroke="#3b2a1a" stroke-width="3"/>
+    <rect x="590" y="640" width="420" height="150" fill="#8e24aa"/>
+    <rect x="590" y="585" width="420" height="50" fill="#ff7043" fill-opacity="0.18"/>
+  </g>
+  <rect x="742" y="330" width="116" height="110" fill="#ffffff" fill-opacity="0.5" stroke="#3b2a1a" stroke-width="7"/>
+  <circle cx="800" cy="620" r="208" fill="#ffffff" fill-opacity="0.35" stroke="#3b2a1a" stroke-width="7"/>
+  <line x1="600" y1="610" x2="1000" y2="610" stroke="#e64a19" stroke-width="7" stroke-dasharray="14 8"/>
+  <text x="1020" y="620" font-size="28" fill="#e64a19" font-weight="bold">← 목표선</text>
+  <text x="1020" y="720" font-size="24" fill="#6a1b9a">지금 붓는 층</text>
+  <text x="1020" y="818" font-size="24" fill="#1565c0">끝난 층 (얇게)</text>
+  <!-- 받침대 -->
+  <rect x="660" y="826" width="280" height="26" rx="8" fill="#8d6e63" stroke="#3b2a1a" stroke-width="5"/>
+  <!-- 안내 문구 -->
+  <text x="800" y="888" font-size="32" fill="#ffffff" font-weight="bold" text-anchor="middle" stroke="#3b2a1a" stroke-width="1.5">선에 닿으면 레버를 닫아요</text>
+</svg>
