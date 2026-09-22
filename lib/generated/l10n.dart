@@ -1022,6 +1022,18 @@ abstract class AppLocalizations {
   /// **'Bowling Description'**
   String get bowlingDesc;
 
+  /// No description provided for @trotRhythm.
+  ///
+  /// In en, this message translates to:
+  /// **'Trot Rhythm'**
+  String get trotRhythm;
+
+  /// No description provided for @trotRhythmDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Hit the beat with your elbow'**
+  String get trotRhythmDesc;
+
   /// No description provided for @rehabGames.
   ///
   /// In en, this message translates to:

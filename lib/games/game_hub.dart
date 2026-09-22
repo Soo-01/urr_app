@@ -15,6 +15,7 @@ import 'games/potion_maker_game.dart';
 import 'games/meal_helper_game.dart';
 import 'games/swimming_game.dart';
 import 'games/bowling_game.dart';
+import 'games/trot_rhythm_game.dart';
 
 class GameHubScreen extends StatelessWidget {
   final BluetoothService bluetoothService;
@@ -46,6 +47,8 @@ class GameHubScreen extends StatelessWidget {
           icon: Icons.carpenter, color: const Color(0xFFFF9800), joint: 'lElbow'),
       _GameInfo(id: 'potion_maker', name: loc.potionMaker, description: loc.potionMakerDesc,
           icon: Icons.science, color: const Color(0xFFAB47BC), joint: 'lElbow'),
+      _GameInfo(id: 'trot_rhythm', name: loc.trotRhythm, description: loc.trotRhythmDesc,
+          icon: Icons.music_note, color: const Color(0xFFC8102E), joint: 'lShoulderEF'),
     ];
 
     final combinedGames = [
@@ -259,6 +262,8 @@ class _GameSetupScreenState extends State<_GameSetupScreen> {
         screen = SwimmingGame(bluetoothService: widget.bluetoothService, config: config);
       case 'bowling':
         screen = BowlingGame(bluetoothService: widget.bluetoothService, config: config);
+      case 'trot_rhythm':
+        screen = TrotRhythmGame(bluetoothService: widget.bluetoothService, config: config);
       default:
         return;
     }

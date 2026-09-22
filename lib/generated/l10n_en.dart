@@ -478,6 +478,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bowlingDesc => 'Bowling Description';
 
   @override
+  String get trotRhythm => 'Trot Rhythm';
+
+  @override
+  String get trotRhythmDesc => 'Hit the beat with your elbow';
+
+  @override
   String get rehabGames => 'Rehab Games';
 
   @override

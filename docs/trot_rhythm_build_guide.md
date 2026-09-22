@@ -8,18 +8,15 @@
 
 ## 현재 상태 (2026-06-29 기준)
 
-| 항목 | 상태 |
-|------|------|
-| 기본 리듬 게임 뼈대 (노트 스폰, 싱크 유지) | ❌ 미완성 |
-| 어깨 관절(좌우 이동) ↔ 레인 매핑 알고리즘 | ❌ 미완성 |
-| 팔꿈치 관절(속도 기반) ↔ 타격(Hit) 스윙 감지 | ❌ 미완성 |
-| Perfect/Good/Miss 시간차 판정 및 콤보 로직 | ❌ 미완성 |
-| 스프라이트 통합 (무대, 가수, 노트, 응원봉) | ❌ 미완성 |
-| 타격 이펙트 및 피버(Fever) 타임 시각 연출 | ❌ 미완성 |
-| 판정 텍스트 팝업 (진/선/미 한자 스타일) | ❌ 미완성 |
-| Suno 생성 BGM ↔ 노트 맵(Map) 데이터 동기화 | ❌ 미완성 |
-| 추임새(SFX) 재생 및 BGM 볼륨 밸런싱 | ❌ 미완성 |
-| Brunnstrom 난이도 ↔ 판정 범위(Tolerance) 연동 | ❌ 미완성 |
+| 항목　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　 | 상태　　　　 |
+| --------------------------------------------------------------------| --------------|
+| 팔꿈치 굴곡/신전 ↔ 응원단장 따라하기 게임 뼈대　　　　　　　　　　 | ✅ 완료　　　 |
+| Perfect/Good/Miss 판정 및 콤보/피버 시스템　　　　　　　　　　　　 | ✅ 완료　　　 |
+| Suno 생성 음원 (`오늘은 달리자.mp3`, 136 BPM) 탑재　　　　　　　　 | ✅ 완료　　　 |
+| 비트 분석 기반 노트/큐 맵 (`trot_map_01.json`, 98 큐) 생성 및 연동 | ✅ 완료　　　 |
+| 오디오 싱크 기반 리얼타임 시간 갱신　　　　　　　　　　　　　　　　| ✅ 완료　　　 |
+| 추임새/판정(SFX) 효과음 재생 및 믹싱 연동　　　　　　　　　　　　 | ✅ 완료　　　 |
+| 고품질 PNG 스프라이트 에셋 통합　　　　　　　　　　　　　　　　　　| 🔄 진행 예정 |
 
 ---
 
@@ -32,10 +29,10 @@
 | **배경 색조** | 흰색/크림 (시즌3) · 아이보리+홍색 (미스트롯4) | 크림 화이트 배경 + 홍색 포인트 조명 |
 | **캐릭터** | 흰 슈트 착용 한국인 남성 트로트 가수 | 흰 슈트 or 개량 한복 가수 아바타 |
 | **판정 UI** | 심사위원 의자 옆 하트 발광 디스플레이 점등 | 하트 발광 팝업 → 판정 피드백 |
-| **순위 텍스트** | 진(眞) · 선(善) · 미(美) 한자 타이포그래피 | PERFECT=眞, GOOD=善, MISS=아쉬워 |
+| **순위 텍스트** | 미스터트롯 스타일 타이포그래피 | PERFECT=완벽해!, GOOD=좋아!, MISS=아쉬워 |
 | **응원봉** | 하늘색(스카이블루) LED · 6가지 애니메이션 | 하늘색 LED 응원봉 커서 |
 | **팬덤 연출** | 공식 응원봉 집단 점멸, 콘서트 레이저쇼 | 피버 타임: 응원봉 전체 점멸 |
-| **전통 요소** | 개량 한복, 구미호, 한자 | 한자 타이포그래피 · 전통 색감 |
+| **전통 요소** | 개량 한복, 한국적 색감 | 한글 타이포그래피 · 전통 색감 |
 
 ### 1-2. 컬러 팔레트
 
@@ -44,88 +41,140 @@
 포인트:  #C8102E (홍색)           — 미스트롯4 한복 색
 응원봉:  #87CEEB (스카이블루)     — 임영웅 응원봉 대표색
 보조:    #1A1A1A (딥 블랙)        — 미스트롯4 한복 검정
-골드:    #D4AF37 (금색)           — 한자 텍스트 금박 효과
+골드:    #D4AF37 (금색)           — 한글 텍스트 금박 효과
 ```
 
 ### 1-3. 판정 텍스트 스타일
 
 | 판정 | 텍스트 | 스타일 |
 |------|--------|--------|
-| Perfect | **眞** (진) | 금박 한자, 대형, 위로 솟구침 |
-| Good | **善** (선) | 흰색 한자, 중형, 팝업 |
+| Perfect | **완벽해!** | 금박, 대형, 위로 솟구침 |
+| Good | **좋아!** | 흰색, 중형, 팝업 |
 | Miss | **아쉬워** | 회색, 소형, 아래로 떨어짐 |
 
-> "얼씨구!" "좋지!" 같은 올드한 추임새는 사용하지 않음.  
-> 진/선은 미스터트롯 실제 시스템에서 가져온 레퍼런스로 시청자 친숙도가 높음.
+---
+
+## 2. 탑재 음원 상세 정보 ("오늘은 달리자")
+
+### 2-1. 기본 메타데이터
+| 항목　　　　　　　　| 사양 / 내용　　　　　　　　　　　　　　　　　　　|
+| ---------------------| --------------------------------------------------|
+| **곡명**　　　　　　| 오늘은 달리자　　　　　　　　　　　　　　　　　　|
+| **아티스트 / 출처** | radiantzithers651 (Suno AI 생성 음원)　　　　　　|
+| **장르 / 분위기**　 | 세미 트로트 (경쾌하고 신나는 응원곡 스타일)　　　|
+| **템포 (BPM)**　　　| **136 BPM** (4/4 박자)　　　　　　　　　　　　　 |
+| **1비트(박) 길이**　| 약 **0.4412초** (441.2 ms)　　　　　　　　　　　 |
+| **1마디(4박) 길이** | 약 **1.7648초** (1764.8 ms)　　　　　　　　　　　|
+| **총 음원 길이**　　| **3분 15초** (195.84초)　　　　　　　　　　　　　|
+| **연동 파일 경로**　| `assets/audio/trot_rhythm/오늘은 달리자.mp3`　　 |
+| **비트 맵 파일**　　| `assets/maps/trot_map_01.json` (총 98개 큐/노트) |
+
+### 2-2. 악곡 구조 및 큐(Cue) 타임라인
+곡의 기승전결에 맞춰 재활 훈련의 난이도와 강도가 유기적으로 조절되도록 구성되어 있습니다:
+
+| 구간 (Section) | 시간대 (초) | 큐 개수 | 운동 강도 및 게임 연출 |
+|----------------|------------|---------|---------------------|
+| **Intro (전주)** | 0:00 ~ 0:14 (0.0s ~ 14.5s) | 4개 | 완만하고 넓은 좌우 팔 흔들기 (워밍업) |
+| **Verse 1 (1절 도입)** | 0:14 ~ 0:35 (14.5s ~ 35.7s) | 12개 | 정박자 중심의 기본 팔꿈치 굴곡/신전 동작 |
+| **Pre-Chorus 1 (1절 빌드업)** | 0:35 ~ 0:49 (35.7s ~ 49.8s) | 8개 | 박자 간격이 좁아지며 리듬 고조 (집중도 유도) |
+| **Chorus 1 (1절 후렴구)** | 0:49 ~ 1:17 (49.8s ~ 77.6s) | 16개 | 신나는 클라이맥스! 10콤보 달성 시 **🔥 FEVER 진입** |
+| **Verse 2 (2절 도입)** | 1:17 ~ 1:38 (77.6s ~ 98.8s) | 12개 | 안정적인 템포로 호흡 가다듬기 (중간 휴식 효과) |
+| **Pre-Chorus 2 (2절 빌드업)** | 1:38 ~ 1:52 (98.8s ~ 112.9s) | 8개 | 점진적 속도 증가 및 타격감 강화 |
+| **Chorus 2 (2절 후렴구)** | 1:52 ~ 2:20 (112.9s ~ 140.7s) | 16개 | 2차 피버 타임 기회 및 고득점 콤보 구간 |
+| **Bridge / Solo (간주)** | 2:20 ~ 2:41 (140.7s ~ 161.9s) | 8개 | 변칙적인 리듬 유도로 인지적 반응성 훈련 |
+| **Final Chorus & Outro (최종 후렴 & 후주)** | 2:41 ~ 3:15 (161.9s ~ 195.8s) | 14개 | 최종 마무리 스트레칭 및 훈련 완료 피드백 |
+| **합계** | **총 195.84초** | **총 98개** | **완곡 시 약 3분 15초의 전신/상지 리듬 재활 운동** |
+
+### 2-3. 재활 훈련(RAS) 관점의 설계 특징
+1. **리듬적 청각 자극 (Rhythmic Auditory Stimulation, RAS)**:
+   - 136 BPM의 빠른 세미 트로트 비트는 뇌졸중 및 상지 기능 저하 환자의 동작 개시와 리듬 동기화(Entrainment)를 유도하여 움직임의 규칙성을 높여줍니다.
+2. **동작 완급 조절 (Pacing)**:
+   - 전주(Intro)와 간주(Bridge)에서 속도를 늦추고 후렴(Chorus)에서 동작을 고조시켜 심폐 및 관절 피로도 누적을 예방합니다.
+3. **오디오 싱크 절대 동기화 (`_songTime`)**:
+   - `AudioPlayer`의 실제 재생 시간을 기준으로 매 프레임 동기화되므로, 프레임 드랍이 발생해도 음악과 응원단장의 모션/노트 판정이 절대 어긋나지 않습니다.
+
+### 2-4. 학술적·임상적 근거 (Rhythmic Auditory-Motor Entrainment)
+
+리듬 동기화(Entrainment)를 활용한 상지 재활 훈련은 신경학적 음악치료(NMT) 및 신경재활의학 분야에서 다수의 최고 권위 저널(Stroke 등)을 통해 입증된 검증된 프로토콜입니다.
+
+| 연구 / 출처 | 대상 및 프로토콜 | 주요 임상 결과 및 의의 |
+|------------|----------------|----------------------|
+| **Thaut et al. (2002)**<br>_Stroke (AHA Journal)_ | 뇌졸중 편마비 환자 대상<br>리듬 청각 큐(Cued vs Noncued)<br>팔 도달(Arm reaching) 훈련 | • **동작 매끄러움(Smoothness) 유의미한 향상**<br>• 다중 가속 곡선이 정상인과 유사한 **단일 종형 가속도(Single-peaked velocity)**로 전환<br>• 이두근-삼두근의 비정상적 동시 수축(Co-contraction) 감소 및 길항근 타이밍 오차 개선 |
+| **Malcolm et al. (2009)**<br>_J. Stroke Cerebrovasc. Dis._ | 만성 뇌졸중 환자 대상<br>리듬 청각-운동 훈련 (RAMT) | • **FMA(Fugl-Meyer) 및 WMFT(Wolf Motor Function) 점수 유의미한 향상**<br>• 경두개 자기자극술(TMS)을 통해 뇌 피질의 **운동 신경가소성(Cortical Reorganization)** 실측 입증 |
+| **Whitall et al. (2000)**<br>_Stroke (AHA Journal)_ | 만성 편마비 환자 대상<br>양측 상지 청각 리듬 반복 훈련<br>(BATRAC 프로토콜) | • 리듬 큐 반복 훈련 시 단순 자가 운동 대비 **상지 근력, 관절 가동 범위(ROM), 일상생활 수행력(ADL) 대폭 향상** |
+
+> **치료적 기전 요약**: 청각 신호(비트)는 뇌의 청각 피질뿐 아니라 소뇌·기저핵·전운동피질을 10~20ms 이내에 즉각 자극하여 손상된 운동 개시(Movement Initiation)를 보조하고, 운동학적 흔들림(Kinematic Variability)을 줄여 일관된 관절 훈련을 가능하게 합니다.
 
 ---
 
-## 2. 게임 구조 한눈에 보기
+## 3. 게임 구조 한눈에 보기
+
+> **실제 설계**: 3레인 낙하노트가 아니라 **측면 "응원단장 따라하기"**. **어깨 각도 1개(lShoulderEF)** 로,
+> 응원단장이 시연하는 목표 각도에 플레이어가 팔을 맞추면 판정. 레인·낙하노트 없음. (어깨+팔꿈치 2자유도는 추후)
 
 ```
-입력 데이터 (BT 센서: 어깨 굽힘/폄/돌림, 팔꿈치 굽힘/폄)
-  ↓ 관절 가동 범위(ROM) Calibration 데이터 적용
+입력: BT 어깨 굴곡/신전 각도(lShoulderEF) → 0.0~1.0 정규화 → _playerAngle
+      (BT 미연결 시 하단 슬라이더 시뮬레이션)
   ↓
 TrotRhythmFlameGame.update(dt)
-  ├── 1. 리듬 코어 동기화 (_updateSync)
-  │     └─ 오디오 재생기에서 실제 시간(_songTime)을 읽어와 게임 시간 동기화
-  ├── 2. 레인 이동 단계 (_updateMovePhase)
-  │     └─ 어깨 각도 데이터를 이산화하여 3개 레인(0, 1, 2) 중 하나로 응원봉 위치 이동
-  ├── 3. 노트 낙하 단계 (_updateNotes)
-  │     └─ 맵 데이터에서 노트 스폰 및 (_songTime - noteTime)을 계산하여 노트의 정확한 Y 좌표 갱신
-  ├── 4. 타격 및 판정 단계 (_updateHitPhase)
-  │     └─ 팔꿈치 폄/굽힘 속도(Velocity) 임계치 돌파 시 스윙 판정 발동
-  │     └─ 현재 응원봉 레인에 있는 가장 아래쪽 노트와의 시간차 검사
-  │         ├── 眞 Perfect (±0.15s) → 콤보 증가, 점수++
-  │         ├── 善 Good (±0.3s) → 콤보 증가, 점수+
-  │         └── 아쉬워 Miss (초과) → 콤보 초기화, 체력 감소
-  ├── 5. 피버 상태 업데이트 (_updateFever)
-  │     └─ 콤보 수에 비례하여 피버 게이지 증가, 100% 도달 시 응원봉 전체 점멸 연출
-  └── 6. 애니메이션 업데이트 (가수 댄스, 하트 발광, 판정 텍스트 팝업)
+  ├ 카운트다운(3·2·1) 종료 → BGM 재생 + _isRunning=true
+  ├ _updateCue(dt): 활성 큐(_activeCue) 진행
+  │   ├ moving : 응원단장 각도(_leaderAngle)를 목표(_leaderTargetAngle)로 easeInOut 보간
+  │   └ holding: 오차 |_playerAngle − _leaderTargetAngle| 로 판정
+  │        ├ < _perfectTol → 완벽해!  (콤보++, 점수 +100×콤보배수)
+  │        ├ < _goodTol    → 좋아!    (콤보++, 점수 +50)
+  │        └ 홀딩 65% 경과까지 못 맞춤 → 아쉬워 (콤보 0, 체력 −1)
+  ├ _updateCrowdEnergy(dt): 콤보 비례 관객 에너지 보간
+  └ 판정 팝업 알파/Y 페이드
   ↓
-render(canvas)
-  ├── 1. 배경: 미스터트롯 스타일 경연 무대 (bg_trot_stage)
-  ├── 2. 조명: 홍색+골드 스팟 조명, LED 배경 월
-  ├── 3. 아바타: 흰 슈트 한국인 트로트 가수 (singer_avatar)
-  ├── 4. 레인: 수직 구분선 (lane_line) 및 판정선 (target_zone)
-  ├── 5. 노트: 하트 모양 낙하 노트 (note_heart)
-  ├── 6. 커서: 하늘색 LED 응원봉 (cursor_stick)
-  ├── 7. 이펙트: 하트 발광 파티클 (hit_effect / BlendMode.plus)
-  ├── 8. 팝업 UI: 眞/善/아쉬워 한자 판정 팝업 (ui_text_*)
-  └── 9. HUD: 콤보 수, 점수, 피버 게이지 (fever_gauge_fill)
+render(canvas)   // 절차적 도형 기본, 스프라이트 있으면 자동 교체(없으면 fallback)
+  ├ (피버=콤보≥10 시) 황금 배경 펄스
+  ├ 배경 무대            (bg_trot_stage)
+  ├ 가수 (오른쪽)        (singer_avatar + 입/눈 표정 오버레이, 바운스)
+  ├ 응원단장 (중앙)      (body_leader + 팔 리그, 다음 동작 ghost 예고)
+  ├ 관객                 (audience_member + cheer_stick 흔들기)
+  ├ 플레이어 (왼쪽)      (body_player + 팔 리그, 목표 ghost + 판정 링)
+  ├ HUD                  (점수·콤보·체력하트5·관객에너지바·FEVER)
+  └ 판정 팝업(완벽해!/좋아!/아쉬워) / 카운트다운 오버레이
 ```
 
 ---
 
-## 3. 핵심 상태 변수
+## 4. 핵심 상태 변수
 
 ```dart
-// 리듬 동기화 상태
-double _songTime = 0.0;           // 음악의 현재 재생 시간 (매 프레임 갱신)
-List<NoteData> _mapData = [];     // 전체 곡의 노트 맵 (시간, 레인)
-List<NoteComponent> _activeNotes = [];
+// 응원단장(시연) 각도 상태
+double _leaderAngle = 0.5;        // 현재 각도 (매 프레임 보간)
+double _leaderTargetAngle = 0.5;  // 이번 큐 목표 각도
+double _leaderPrevAngle = 0.5;    // 보간 시작점
 
-// 관절 매핑 상태
-int _currentLane = 1;             // 0: Left, 1: Center, 2: Right
-double _elbowVelocity = 0.0;      // 팔꿈치 각도 변화량 (스윙 판정용)
-bool _isHitting = false;          // 디바운스 처리용 플래그
-double _hitCooldownTimer = 0.0;   // 연속 타격 방지 쿨다운
+// 플레이어 각도 (BT lShoulderEF 또는 슬라이더)
+double _playerAngle = 0.5;
+
+// 큐 시퀀스 (응원단장 동작 지시)
+late List<_Cue> _cues;            // _Cue(targetAngle, transitionTime, holdTime)
+int _cueIndex = 0;
+_Cue? _activeCue;                 // phase: moving → holding → done
+double _globalTimer = 0.0;
 
 // 점수 및 진행 상태
-int _score = 0;
-int _combo = 0;
-int _maxCombo = 0;
-int _lifeCount = 5;
+int _score = 0, _combo = 0, _maxCombo = 0;
+int _hits = 0, _misses = 0, _lifeCount = 5;
+double _crowdEnergy = 0.3;        // 관객 에너지 (콤보 비례)
 
-// 피버(Fever) 시스템
-double _feverGauge = 0.0;         // 0.0 ~ 100.0
-bool _isFeverTime = false;
-double _feverTimer = 0.0;         // 피버 지속 시간
+// 피버 — 게이지가 아니라 콤보 임계
+bool get _isFever => _combo >= 10;
+
+// 스프라이트 (없으면 null → 절차적 렌더 fallback)
+ui.Image? _imgBg, _imgSinger, _imgSingerMouthOpen, _imgSingerEyesClosed;
+ui.Image? _imgBodyLeader, _imgBodyPlayer, _imgStick, _imgAudience;
+// 팔 리그 — 인물별 개별 (공유 아님)
+ui.Image? _imgLeaderArmUpper, _imgLeaderArmFore, _imgPlayerArmUpper, _imgPlayerArmFore;
 ```
 
 ---
 
-## 4. 난이도 및 생체역학 파라미터
+## 5. 난이도 및 생체역학 파라미터
 
 어르신의 인지/반응 속도를 고려하여 일반 리듬게임보다 판정 시간을 매우 관대하게 둡니다.
 
@@ -140,7 +189,7 @@ double get goodWindow => 0.4 - (config.difficultyLevel * 0.02);
 double get swingThreshold => 15.0 / config.difficultyLevel;
 ```
 
-| Level | 노트 낙하 속도 | 판정선 도달 시간 | 眞 허용치 | 善 허용치 |
+| Level | 노트 낙하 속도 | 판정선 도달 시간 | 완벽해! 허용치 | 좋아! 허용치 |
 |-------|-------------|---------------|---------|---------|
 | 1 | 매우 느림 | 화면 생성 후 3초 | ±0.23초 | ±0.38초 |
 | 3 | 보통 | 화면 생성 후 2.5초 | ±0.19초 | ±0.34초 |
@@ -148,7 +197,7 @@ double get swingThreshold => 15.0 / config.difficultyLevel;
 
 ---
 
-## 5. 스프라이트 (에셋) 목록
+## 6. 스프라이트 (에셋) 목록
 
 | 파일명 | 캔버스 크기 | 게임 내 크기 | 배경 처리 | 애니메이션 |
 |--------|-----------|------------|---------|---------|
@@ -159,23 +208,23 @@ double get swingThreshold => 15.0 / config.difficultyLevel;
 | `note_heart.png` | 256×256 | 100×100 px | 투명화 | 수직 낙하 |
 | `cursor_stick.png` | 256×512 | 100×250 px | 투명화 | 좌우 이동 + 스윙 |
 | `hit_effect.png` | 512×512 | 200×200 px | **검정 유지** | 순간 확대 & 페이드아웃 |
-| `ui_text_jin.png` | 512×256 | 200×100 px | 투명화 | 팝업 (Scale + Move Up) |
-| `ui_text_seon.png` | 512×256 | 200×100 px | 투명화 | 팝업 (Scale + Move Up) |
+| `ui_text_perfect.png` | 512×256 | 200×100 px | 투명화 | 팝업 (Scale + Move Up) |
+| `ui_text_good.png` | 512×256 | 200×100 px | 투명화 | 팝업 (Scale + Move Up) |
 | `ui_text_miss.png` | 512×256 | 200×100 px | 투명화 | 팝업 (떨어짐 연출) |
 
 > 미러볼/네온사인 제거 → 하트 발광 + 홍색 스팟 조명으로 대체
 
 ---
 
-## 6. 애니메이션 연출 가이드
+## 7. 애니메이션 연출 가이드
 
-### 6-1. 트랜스폼 이펙트
+### 7-1. 트랜스폼 이펙트
 
 - **하트 판정선 펄스**: `target_zone`에 `ScaleEffect.by(Vector2(1.1, 1.1), EffectController(duration: 0.5, infinite: true, alternate: true))` + `OpacityEffect`
 - **가수 댄스**: `singer_avatar`에 `MoveEffect.by(Vector2(0, 10), EffectController(duration: 0.4, infinite: true, alternate: true))` (무릎 바운스)
-- **판정 텍스트 팝업**: `ui_text_jin` 생성 → `ScaleEffect.to(1.3)` + `MoveEffect.by(Vector2(0, -60))` 동시 재생 → `RemoveEffect()`
+- **판정 텍스트 팝업**: `ui_text_perfect` 생성 → `ScaleEffect.to(1.3)` + `MoveEffect.by(Vector2(0, -60))` 동시 재생 → `RemoveEffect()`
 
-### 6-2. 스윙 애니메이션 (응원봉 타격)
+### 7-2. 스윙 애니메이션 (응원봉 타격)
 
 ```dart
 // SequenceEffect로 0.15초 안에 휘두름 → 원상복구
@@ -186,7 +235,7 @@ SequenceEffect([
 ])
 ```
 
-### 6-3. 피버 타임 (Fever Time) 연출
+### 7-3. 피버 타임 (Fever Time) 연출
 
 - **응원봉 점멸**: 커서 응원봉 색상을 하늘색 → 흰색 → 하늘색으로 빠르게 순환 (임영웅 응원봉 LED 효과 참조)
 - **홍색 오버레이**: `Paint()..color = Color(0x44C8102E)..blendMode = BlendMode.colorDodge` 전체 화면에 적용
@@ -194,17 +243,17 @@ SequenceEffect([
 
 ---
 
-## 7. 스프라이트 제작 파이프라인
+## 8. 스프라이트 제작 파이프라인
 
 ### 단계 1: AI 이미지 생성
 
 - 캐릭터·오브젝트(가수, 응원봉, 노트, 텍스트): **초록 배경 #00FF00** 필수
 - 빛·이펙트(판정선, 타격 폭죽): **검정 배경 #000000** (BlendMode.plus 용)
 
-### 단계 2: 타이포그래피 — 眞/善 한자 이미지
+### 단계 2: 판정 텍스트 이미지 제작
 
-- AI가 한자를 부정확하게 그릴 수 있으므로 **포토샵/Canva에서 직접 제작**
-- 폰트: 붓글씨 계열 (예: 나눔손글씨, 문체부 공공서체) — 눈누(noonnu.cc) 상업용 무료
+- **포토샵/Canva에서 직접 제작**
+- 폰트: 굵고 둥근 한글 계열 (예: 나눔고딕ExtraBold, 배달의민족 폰트) — 눈누(noonnu.cc) 상업용 무료
 - 스타일: 금박 그라디언트 + 두꺼운 외곽선 + 초록 배경 PNG
 
 ### 단계 3: 배경 제거 (누끼)
@@ -225,27 +274,143 @@ SequenceEffect([
 
 ---
 
-## 8. AI 이미지 생성 프롬프트
+## 9. AI 이미지 생성 프롬프트 (리듬천국 스타일 · 어깨 관절 리그)
 
-**공통 스타일**: `Korean trot music competition show style (inspired by Mr. Trot), modern K-entertainment stage, cream white and crimson red color palette, warm golden spotlights, cel-shaded cartoon, bold black outlines, mobile rhythm game asset`
+> 실제 코드는 **측면 따라하기 + 어깨 관절 리그**(1자유도, 팔 전체가 어깨축 스윙 / 3레인 낙하노트 아님). 에셋 규격은 [assets/images/trot_rhythm/ASSET_SPEC.md] 참조.
+> 그림체 = **리듬천국 플랫 2D**, 복장 = **미스터트롯(한국 트로트 경연 TV) + 마칭밴드/치어리더 스타일**(명칭·로고·실존인물 금지, §13).
+> 응원단장/플레이어 = **마칭밴드 치어리더 전신**(응원단장 빨강 군악대, 플레이어 흰+파랑), 둘 다 우리 `cheer_stick`을 듦.
 
-### 초록 배경 (투명화용)
+### 9-0. 공통 프리앰블 (모든 프롬프트 앞에 붙임)
 
-- **가수 아바타**: `A handsome Korean male trot singer in his 30s wearing a pristine white suit, holding a microphone, enthusiastic singing pose, full body, bright stage lighting, solid lime green background #00FF00`
-- **노트 (하트)**: `A glowing heart shape, crimson red with golden shimmer, 3D shiny, cute and chunky, solid lime green background #00FF00`
-- **응원봉**: `A sleek LED light stick (K-pop cheering stick), sky blue glowing color, modern design, bright illuminated, solid lime green background #00FF00`
+```
+Rhythm Heaven (Rhythm Tengoku) video game art style: flat 2D vector illustration,
+thick bold uniform black outlines, solid flat colors, minimal cel shading,
+simple clean geometric shapes, cute quirky charming minimalist character design,
+bright cheerful palette, Nintendo WarioWare aesthetic.
+Palette: cream white #FFFAF0, crimson red #C8102E, sky blue #87CEEB, gold #D4AF37, black.
+STRICTLY FLAT 2D, hand-drawn 2D game sprite, sticker-style, orthographic flat view,
+no depth, no 3D, no realistic lighting, single flat color fills only.
+Negative: 3D, 3D render, CGI, Pixar, clay render, realistic/volumetric shading,
+glossy reflections, photorealistic, gradient shading, text, watermark, logo, extra limbs.
+```
 
-### 검정 배경 (BlendMode.plus용)
+### 9-1. 배경 (초록 아님 · 무대는 오른쪽)
 
-- **판정선**: `A glowing horizontal target line, warm golden neon light, soft outer glow, pure black background #000000`
-- **레인 구분선**: `A tall vertical glowing neon divider line, crimson red soft glow, 1:8 aspect ratio, pure black background #000000`
-- **타격 이펙트**: `An explosion of glowing hearts and golden sparks, crimson and gold colors, radiating outward, pure black background #000000`
+```
+[프리앰블] A glamorous Korean trot music TV competition stage (fictional, no logos, no text),
+cream white and crimson red theme with gold accents.
+The MAIN STAGE, spotlight and runway are on the RIGHT SIDE (bright golden spotlight on the right
+where a singer stands); the LEFT SIDE is a lower open stage / audience-floor area.
+Sparkling LED back wall, simple geometric floor, grand and festive,
+WIDE 16:9 EMPTY stage, NO characters, asymmetric composition weighted to the right. --ar 16:9
+```
+→ `bg_trot_stage.png` (1920×1080, 불투명)
+
+### 9-2. 가수 베이스 (세로형 캔버스 · 초록 크로마)
+
+```
+[프리앰블] A cheerful cartoon Korean male trot singer (fictional), wearing a glossy WHITE tuxedo
+suit with subtle gold trim (Korean trot competition performer vibe), holding a microphone up,
+¾ three-quarter view facing slightly toward viewer, MOUTH CLOSED gentle smile, EYES OPEN,
+full body standing, centered, isolated on SOLID FLAT chroma green background #00B140.
+```
+→ `singer_avatar.png` (512×768 권장, 세로형) — 초록 제거
+
+### 9-3. 가수 표정 오버레이 — ⚠️ img2img(마스크 편집)로 제작
+
+> 새로 생성 금지. **9-2 결과를 인페인팅**으로 입/눈만 바꿔 정합성 유지. 세 파일 캔버스 크기 동일 필수.
+- 입: `Keep everything identical, same pose and position. Only open the mouth wide as if singing.` → 입 부위만 남기고 투명 = `singer_mouth_open.png`
+- 눈: `Keep everything identical, same pose and position. Only gently close both eyes (blinking).` → 눈 부위만 남기고 투명 = `singer_eyes_closed.png`
+
+### 9-4. 몸통 2종 (전신 · 봉 든 팔만 제외 · 초록 크로마)
+
+> **전신(머리~부츠)**. 한 손은 허리에(고정, 몸통에 그림), **봉 든 쪽(화면 오른쪽) 어깨는 팔 없이 비움** → 리그 팔이 붙어 스윙. 화면엔 항상 완전한 전신으로 보임.
+
+응원단장 (빨강 군악대):
+```
+[프리앰블] A cheerful young Korean cheer-squad LEADER girl, FULL BODY (head to boots),
+RED military marching-band cheer jacket with gold buttons and braid, red shako hat with white plume,
+short white pleated skirt, white lace-up boots, ¾ front view, big smile.
+ONE arm resting HAND ON HIP (viewer's left). The OTHER arm (viewer's RIGHT — the raised stick side)
+is OMITTED: that shoulder is EMPTY, NO raised arm, NO pompom, NO baton.
+Isolated on solid flat chroma green #00B140.
+```
+→ `body_leader.png` (384×640)
+
+플레이어 (흰+파랑):
+```
+[프리앰블] A cheerful young Korean cheerleader girl (the player), FULL BODY (head to boots),
+WHITE marching-band cheer jacket with BLUE vest and gold trim, short white pleated skirt,
+white lace-up boots, ponytail, ¾ front view, gentle smile.
+ONE arm resting HAND ON HIP (viewer's left). The OTHER arm (viewer's RIGHT — raised stick side)
+is OMITTED: EMPTY shoulder, NO raised arm, NO baton, NO pompom.
+Isolated on solid flat chroma green #00B140.
+```
+→ `body_player.png` (384×640)
+
+### 9-5. 관객 (작게 · 응원봉 없음 · 초록 크로마)
+
+```
+[프리앰블] A tiny simple cartoon audience fan, small round body and head, ¾ view, cheering happily,
+colorful casual clothes, NO light stick (added by code), very simple, isolated on chroma green #00B140.
+```
+→ `audience_member.png` (128×192) — 16명이 1장 공유
+
+### 9-6. 응원봉 (세로 · 초록 크로마)
+
+```
+[프리앰블] A K-pop LED cheering light stick, sky blue #87CEEB glowing, standing PERFECTLY VERTICAL
+pointing STRAIGHT DOWN, glowing white bulb tip at the very BOTTOM, handle grip at the very TOP,
+simple clean design, centered, isolated on chroma green #00B140.
+```
+→ `cheer_stick.png` (64×300)
+
+### 9-7. 팔 리그 — ⚠️ 어깨 스윙 · 인물별 4종 (공유 아님)
+
+봉 든 팔 = 별도 리그. **어깨축으로 위/아래 스윙**(팔꿈치 고정). 세로로 곧게, **어깨끝=상단중앙**. 소매색은 각 의상에 맞춤.
+
+응원단장 — 빨강 소매:
+```
+[프리앰블] A SEPARATE floating cheerleader UPPER-ARM segment (shoulder to elbow),
+RED military marching-band jacket sleeve with gold trim, straight VERTICAL limb,
+shoulder end at TOP, elbow at bottom, NOT attached to any body. Chroma green #00B140, centered.
+```
+→ `leader_arm_upper.png` (96×220)
+```
+[프리앰블] A SEPARATE floating forearm ending in a WHITE-GLOVED hand, RED jacket cuff with gold trim,
+straight VERTICAL limb, elbow at TOP, gloved hand at bottom (holding nothing),
+NOT attached to any body. Chroma green #00B140, centered.
+```
+→ `leader_arm_fore.png` (96×260)
+
+플레이어 — 흰 소매:
+```
+[프리앰블] A SEPARATE floating cheerleader UPPER-ARM segment (shoulder to elbow),
+WHITE marching-band jacket sleeve with gold trim (subtle blue accent ok), straight VERTICAL limb,
+shoulder end at TOP, elbow at bottom, NOT attached to any body. Chroma green #00B140, centered.
+```
+→ `player_arm_upper.png` (96×220)
+```
+[프리앰블] A SEPARATE floating forearm ending in a WHITE-GLOVED hand, WHITE jacket cuff with gold trim,
+straight VERTICAL limb, elbow at TOP, gloved hand at bottom (holding nothing),
+NOT attached to any body. Chroma green #00B140, centered.
+```
+→ `player_arm_fore.png` (96×260)
+
+`cheer_stick.png`(하늘색 LED 봉)은 응원단장·플레이어 공유.
+
+### 9-8. 핵심 팁
+
+1. **키잉**: 인물/오브젝트는 `#00B140` 초록 단색 배경으로 뽑고 remove.bg로 제거 (흰 슈트를 흰 배경에 뽑으면 못 지움).
+2. **가수 오버레이는 반드시 img2img 인페인팅** — 새 생성 금지(정합성 깨짐). 단순 도형이라 포토샵 직접 덧그리기가 더 확실.
+3. **일관성**: 가수·응원단장·플레이어를 같은 세션/시드로 이어 뽑으면 화풍 통일.
+4. **판정 텍스트**(완벽해!/좋아!/아쉬워)는 AI 텍스트가 불안정 → Canva/폰트로 직접(현재는 코드 폰트 렌더라 없어도 됨).
 
 ---
 
-## 9. 음악 제작 — Suno AI
+## 10. 음악 제작 — Suno AI
 
-### 9-1. Suno 프롬프트 (트로트 스타일)
+### 10-1. Suno 프롬프트 (트로트 스타일)
 
 ```
 Korean trot song, upbeat and cheerful, traditional Korean instruments (janggu, gayageum),
@@ -255,14 +420,14 @@ suitable for elderly rehabilitation exercise, no lyrics or instrumental only
 
 > 가사 있는 버전을 원하면 `[verse]`, `[chorus]` 태그 활용
 
-### 9-2. 저작권
+### 10-2. 저작권
 
 | 플랜 | 상업적 사용 | 비고 |
 |------|-----------|------|
 | 무료 | ❌ Suno 소유 | 비상업 임상·연구 목적은 실질 위험 낮음 |
 | Pro/Premier | ✅ 사용자 소유 | 논문 발표·외부 배포 시 권장 |
 
-### 9-3. BPM 추출 및 노트 맵 생성 워크플로우
+### 10-3. BPM 추출 및 노트 맵 생성 워크플로우
 
 ```
 Suno에서 MP3 다운로드
@@ -285,9 +450,9 @@ assets/maps/trot_map_01.json 으로 저장
 
 ---
 
-## 10. 리듬 게임 특화 로직 (매우 중요)
+## 11. 리듬 게임 특화 로직 (매우 중요)
 
-### 10-1. 오디오 싱크 기반 시간 갱신
+### 11-1. 오디오 싱크 기반 시간 갱신
 
 ```dart
 // dt 누적 금지 — 오디오 플레이어 현재 위치를 직접 폴링
@@ -296,7 +461,7 @@ if (_audioPlayer.state == PlayerState.playing) {
 }
 ```
 
-### 10-2. 노트 위치 절대 계산
+### 11-2. 노트 위치 절대 계산
 
 ```dart
 // position.y += speed * dt 사용 금지
@@ -307,13 +472,13 @@ position.y = gameRef.targetY - (timeDiff * (fallDistance / fallTime));
 
 ---
 
-## 11. 오디오 및 SFX
+## 12. 오디오 및 SFX
 
 | 구분 | 이벤트 | 파일명 | 볼륨 |
 |------|--------|--------|------|
 | BGM | 게임 시작 | `trot_bgm_01.mp3` (Suno 생성) | 0.7 |
-| SFX | 眞 (Perfect) 타격 | `hit_perfect_heart.ogg` | 1.0 (맑은 종소리) |
-| SFX | 善 (Good) 타격 | `hit_good_chime.ogg` | 1.0 (부드러운 차임) |
+| SFX | 완벽해! (Perfect) 타격 | `hit_perfect_heart.ogg` | 1.0 (맑은 종소리) |
+| SFX | 좋아! (Good) 타격 | `hit_good_chime.ogg` | 1.0 (부드러운 차임) |
 | SFX | 아쉬워 (Miss) | `hit_miss_dull.ogg` | 0.8 (둔탁한 소리) |
 | SFX | 피버 진입 | `fever_fanfare.ogg` | 1.0 (짧은 팡파레) |
 
@@ -322,14 +487,14 @@ position.y = gameRef.targetY - (timeDiff * (fallDistance / fallTime));
 
 ---
 
-## 12. 저작권 주의사항
+## 13. 저작권 주의사항
 
 | 항목 | 사용 가능 여부 | 근거 |
 |------|-------------|------|
 | "미스터트롯" 명칭·로고 | ❌ 불가 | TV조선 상표 |
 | 실제 출연자 얼굴·목소리 | ❌ 불가 | 초상권·퍼블리시티권 |
 | 트로트 경연 무대 스타일·분위기 | ✅ 가능 | 스타일 자체는 저작권 대상 아님 |
-| 진(眞)·선(善)·미(美) 한자 | ✅ 가능 | 일반 한자, 누구나 사용 가능 |
+| 판정 텍스트 (완벽해!/좋아!/아쉬워) | ✅ 가능 | 일반 한국어 |
 | Suno 생성 음원 (무료 플랜) | ⚠️ 주의 | 비상업 목적은 실질 위험 낮음, 외부 배포 시 Pro 권장 |
 | 효과음 CC0 | ✅ 가능 | freesound.org CC0 태그 필터 필수 확인 |
 | 폰트 | ✅ 가능 | 눈누(noonnu.cc)에서 상업용 무료 폰트 사용 |
@@ -338,44 +503,36 @@ position.y = gameRef.targetY - (timeDiff * (fallDistance / fallTime));
 
 ---
 
-## 13. 작업 체크리스트
+## 14. 작업 체크리스트
 
-### Phase 1 — 리듬 코어 로직 (플레이스홀더 음악으로 시작)
+### Phase 1 — 리듬 코어 로직 (기본 뼈대 및 음원 연동)
 
 #### 1-A. 파일 뼈대 생성
-- [ ] `lib/games/games/trot_rhythm_game.dart` 파일 생성
-- [ ] `claude_code_game_dev_guide.md` 패턴대로 `FlameGame + StatefulWidget` 기본 구조 작성
-- [ ] `NoteData` 클래스 정의 (time: double, lane: int)
-- [ ] `NoteComponent` 클래스 생성 (`PositionComponent` 상속, hitTime/lane 필드)
+- [x] `lib/games/games/trot_rhythm_game.dart` 파일 생성
+- [x] `claude_code_game_dev_guide.md` 패턴대로 `FlameGame + StatefulWidget` 기본 구조 작성
+- [x] `_Cue` 클래스 정의 (targetAngle: double, transitionTime: double, holdTime: double)
+- [x] 응원단장(시범) + 관객(반응) + 플레이어(하단) 씬 구조 구현
 
-#### 1-B. 오디오 + 싱크 (플레이스홀더 사용)
-- [ ] `assets/audio/trot_rhythm/` 폴더 생성
-- [ ] 임시 메트로놈 MP3 다운로드 (freesound.org CC0, 120 BPM) → `trot_bgm_placeholder.mp3`로 저장
-- [ ] `pubspec.yaml` flutter.assets에 `assets/audio/trot_rhythm/` 경로 추가
-- [ ] `onLoad()`에서 `FlameAudio.audioCache.loadAll([bgm, sfx 목록])` 호출
-- [ ] `_audioPlayer` 인스턴스 생성 및 BGM 재생 시작
-- [ ] `update(dt)` 내에서 `_songTime` 폴링 갱신 구현 (10-1 섹션 코드)
-- [ ] 일시정지/재개 시 `_audioPlayer.pause()` / `resume()` 연동
+#### 1-B. 오디오 + 싱크
+- [x] `assets/audio/trot_rhythm/` 폴더 생성
+- [x] 트로트 정식 음원 탑재 (`오늘은 달리자.mp3`, 136 BPM, 195.8초)
+- [x] `pubspec.yaml` flutter.assets에 `assets/audio/trot_rhythm/` 경로 등록
+- [x] `onLoad()`에서 `_audioPlayer.setSource(AssetSource('audio/trot_rhythm/오늘은 달리자.mp3'))` 로드
+- [x] 카운트다운(3, 2, 1) 종료 시점 BGM 루프 재생 시작 및 게임 루프 동기화
+- [x] 게임 종료/이탈 시 `_audioPlayer.stop()` 및 리소스 정리
 
-#### 1-C. 노트 맵 파싱 + 스폰 (더미 맵으로 시작)
-- [ ] `pubspec.yaml` assets에 `assets/maps/` 경로 추가
-- [ ] 120 BPM 기준 0.5초 간격 더미 맵 직접 작성 → `assets/maps/trot_map_placeholder.json`:
-  ```json
-  [
-    {"time": 1.0, "lane": 1}, {"time": 1.5, "lane": 0},
-    {"time": 2.0, "lane": 1}, {"time": 2.5, "lane": 2}
-  ]
-  ```
-- [ ] `onLoad()`에서 `assets/maps/trot_map_placeholder.json` 로드 및 `_mapData` 파싱
-- [ ] `update(dt)`에서 `_songTime >= note.time && !note.spawned` 조건으로 스폰
-- [ ] `NoteComponent`를 게임 트리에 `add()`
-- [ ] 판정선 아래로 내려간 노트(Miss 처리 후) `removeFromParent()` 호출
+#### 1-C. 노트/큐 맵 파싱 + 스폰
+- [x] `pubspec.yaml` assets에 `assets/maps/` 경로 등록
+- [x] 136 BPM 타임스탬프 기반 정식 큐 맵 제작 (`assets/maps/trot_map_01.json`, 98개 큐)
+- [x] `onLoad()`에서 `assets/maps/trot_map_01.json` 로드 및 파싱 (실패 시 절차적 생성 fallback)
+- [x] 큐 시퀀스에 맞추어 응원단장의 팔꿈치 굴곡/신전 동작 실시간 시연
+- [x] 마지막 큐 도달 시 자동으로 `GameResultScreen`으로 점수 및 정확도 전달
 
-#### 1-D. 노트 낙하 계산
-- [ ] `targetY` 상수: 화면 하단에서 150px 위 (판정선 Y좌표)
-- [ ] `fallTime` 상수: Level별 2.0~3.0초 (4번 섹션 테이블 참조)
-- [ ] `NoteComponent.update(dt)` 내 절대 좌표 계산 구현 (10-2 섹션 코드)
-- [ ] `_songTime` 이전에 hitTime이 지난 노트 → Miss 처리 후 제거
+#### 1-D. 각도 추적 및 판정
+- [x] 블루투스 센서(`PART:lElbow`) 각도 실시간 정규화(0.0~1.0) 구독
+- [x] 블루투스 미연결 시 하단 슬라이더 시뮬레이션 모드 지원
+- [x] 응원단장 목표 각도와의 오차 기반 3단계 판정 ("완벽해!", "좋아!", "아쉬워")
+- [x] 콤보 누적 및 10콤보 이상 달성 시 피버(Fever) 모드 발동
 
 ---
 
@@ -431,10 +588,10 @@ position.y = gameRef.targetY - (timeDiff * (fallDistance / fallTime));
 - [ ] `target_zone.png` — 골드 판정 링 (256×256, **검정** 배경)
 - [ ] `lane_line.png` — 홍색 수직 선 (128×1024, **검정** 배경)
 
-#### 3-B. 한자 텍스트 이미지 직접 제작
-- [ ] 눈누(noonnu.cc)에서 붓글씨 계열 TTF 다운로드 (상업용 무료 필터)
-- [ ] 포토샵/Canva에서 `ui_text_jin.png` 제작: "眞" 금박 그라디언트 + 검정 외곽선 (512×256, 초록 배경)
-- [ ] `ui_text_seon.png` 제작: "善" 흰색 + 홍색 외곽선 (512×256, 초록 배경)
+#### 3-B. 한글 판정 텍스트 UI 제작
+- [ ] 눈누(noonnu.cc)에서 깔끔한 한국어 폰트(상업용 무료) 활용
+- [ ] `ui_text_perfect.png` 제작: "완벽해!" 금박 그라디언트 + 검정 외곽선 (512×256, 초록 배경)
+- [ ] `ui_text_good.png` 제작: "좋아!" 흰색 + 홍색 외곽선 (512×256, 초록 배경)
 - [ ] `ui_text_miss.png` 제작: "아쉬워" 회색 + 가는 외곽선 (512×256, 초록 배경)
 
 #### 3-C. 누끼 + 최적화
@@ -563,7 +720,7 @@ position.y = gameRef.targetY - (timeDiff * (fallDistance / fallTime));
 | 팔꿈치 특정 각도 도달로 스윙 판정 | 각도 **변화량(velocity)** 임계치로 판정해야 천천히 뻗는 것과 구분 |
 | 타격 후 디바운싱 미구현 | `_hitCooldownTimer` 0.3초로 연속 판정 방지 |
 | 효과음 타격 시 파일 로드 | `FlameAudio.audioCache.loadAll()`로 `onLoad`에서 미리 캐싱 |
-| 한자 텍스트를 기본 폰트로 렌더링 | PNG 이미지 에셋으로 굽거나 TTF 폰트 파일을 직접 로드 |
+| 판정 텍스트를 기본 폰트로 렌더링 | PNG 이미지 에셋으로 굽거나 TTF 폰트 파일을 직접 로드 |
 
 ---
 
@@ -578,6 +735,6 @@ position.y = gameRef.targetY - (timeDiff * (fallDistance / fallTime));
 6.  낙하하는 하트 노트들 (note_heart)
 7.  응원봉 커서 (cursor_stick)
 8.  타격 하트 파티클 (hit_effect / BlendMode.plus)
-9.  판정 텍스트 팝업 (ui_text_jin / ui_text_seon / ui_text_miss)
+9.  판정 텍스트 팝업 (ui_text_perfect / ui_text_good / ui_text_miss)
 10. HUD 고정 요소 (점수, 콤보, 피버 게이지, 체력)
 ```
