@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:math';
+// dart:ui.Image 는 material.dart의 Image 위젯과 이름이 겹쳐 접두사로 구분.
+import 'dart:ui' as ui;
 // dart:async의 Timer(주기적 모터 저항 동기화용)와 이름이 겹쳐 숨김 처리.
 import 'package:flame/components.dart' hide Timer;
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import '../../bluetooth.dart';
 import '../../generated/l10n.dart';
 import '../../robot_protocol.dart';
@@ -44,6 +47,8 @@ enum TugMode { cycle, hold }
 
 /// 범용 파티클 (먼지·물보라·색종이·불꽃·힘줄기 연출 공용).
 /// shield_guard_game.dart의 _Particle과 동일 패턴 + 중력/소멸속도/회전을 옵션화.
+/// image가 지정되면 원/사각형 대신 그 이미지(또는 srcRect로 자른 일부)를
+/// life에 따라 페이드아웃하며 그린다 — 물보라·색종이 스프라이트용.
 class _Particle {
   double x, y, vx, vy;
   double life = 1.0;
@@ -52,8 +57,12 @@ class _Particle {
   final double gravity; // px/s^2 (아래 방향)
   final double fade; // life 감소 속도 (1/s)
   final bool rect; // true면 회전하는 사각형(색종이)
+  final bool sparkle; // true면 네 꼭짓점 반짝임(별) 모양
   double angle;
   final double spin; // rad/s
+  final ui.Image? image; // 지정 시 도형 대신 이 이미지를 그린다
+  final Rect? srcRect; // image 안에서 잘라 쓸 영역 (null이면 전체)
+  final double scale; // image 렌더 배율 (radius 기준 목표 폭 계산용)
 
   _Particle({
     required this.x,
@@ -65,8 +74,12 @@ class _Particle {
     this.gravity = 220,
     this.fade = 1.2,
     this.rect = false,
+    this.sparkle = false,
     this.angle = 0,
     this.spin = 0,
+    this.image,
+    this.srcRect,
+    this.scale = 1.0,
   });
 }
 
@@ -114,6 +127,55 @@ class TugOfWarFlameGame extends FlameGame {
   // ── 상대(AI) 힘 — 동물 종류별 기본 힘 + 적응형 보정 + 고유 당기기 패턴 ────
   double _aiPower = 3.0;
   late final AnimalType _currentAnimal;
+
+  // ── 실제 스프라이트 (플레이어 + 동물 3종) ────────────────────────────────
+  // assets/tugofwar/player 1~4.png, champ/gor/or 1~4.png — 숫자가 클수록
+  // 더 세게 힘을 쓰는 자세. 로드 실패 시 목록이 비어 있게 되고, 그 경우
+  // 각각 기존 절차적 그래픽(_paintHuman/_paintChimp/_paintOrangutan/
+  // _paintGorilla)으로 자동 대체된다.
+  List<ui.Image> _playerFrames = [];
+  List<ui.Image> _champFrames = [];
+  List<ui.Image> _gorFrames = [];
+  List<ui.Image> _orFrames = [];
+  static const double _playerSpriteH = 150.0; // 목표 높이(px) — 1번 프레임 기준
+  static const double _champSpriteH = 140.0;
+  static const double _gorSpriteH = 150.0;
+  static const double _orSpriteH = 145.0;
+  // 프레임마다 원본 픽셀 크기가 제각각이라(포즈별로 따로 생성된 이미지),
+  // "이번 프레임 높이를 targetH에 맞춘다"는 식으로 매번 다시 스케일하면
+  // 포즈가 바뀔 때마다 캐릭터가 커졌다 작아졌다 하는 것처럼 보인다. 그래서
+  // 1번 프레임 기준으로 배율을 한 번만 계산해 4프레임 전부에 동일하게
+  // 적용한다 — _loadFighterSprites()에서 세팅.
+  double _playerSpriteScale = 1.0;
+  double _champSpriteScale = 1.0;
+  double _gorSpriteScale = 1.0;
+  double _orSpriteScale = 1.0;
+  // 각 프레임에서 로프를 쥔 손(맞잡은 주먹)이 이미지 안 어디쯤(너비/높이
+  // 대비 비율)에 있는지 실측한 값 — Python/PIL로 후보 좌표에 십자 표시를
+  // 그려 눈으로 확인하는 방식으로 잡았다. 발이 지면에 닿도록 배치한 뒤,
+  // 이 비율로 해당 프레임의 로프 손 앵커(로컬 좌표)를 계산한다
+  // (_spriteGripLocal 참고). assets/tugofwar 스프라이트를 교체하면 이
+  // 값들도 다시 맞춰야 한다.
+  // (2026-09-22 재측정: 이전 값들이 손목/팔뚝 근처에 머물러 있었다 — 3배
+  // 확대해서 다시 보니 실제 맞잡은 주먹 관절은 그보다 한참 더 오른쪽에
+  // 있었음. 아래 값은 3배 확대 이미지에 십자 표시를 찍어 주먹 위에 정확히
+  // 오는지 눈으로 확인하며 다시 잡았다.)
+  static const double _playerHandFracX = 0.80, _playerHandFracY = 0.49;
+  static const double _champHandFracX = 0.80, _champHandFracY = 0.47;
+  static const double _gorHandFracX = 0.83, _gorHandFracY = 0.50;
+  static const double _orHandFracX = 0.83, _orHandFracY = 0.51;
+
+  // ── 배경/땅/매듭 스프라이트 ───────────────────────────────────────────────
+  // 하나라도 로드 실패하면 그 부분만 기존 절차적 그래픽으로 자동 대체된다.
+  // rope.png(로프 몸통)는 의도적으로 로드하지 않는다 — 작은 타일을 이어
+  // 붙이는 스탬프 방식이 매끄럽지 않아(이음새가 도드라짐) 당분간 절차적
+  // (canvas) 로프를 쓰기로 했다. knot.png(중앙 매듭)는 새 버전이 로프가
+  // 겹쳐 그려지지 않는 독립된 매듭 그림이라 계속 사용한다.
+  ui.Image? _bgImage; // background.png — 하늘/먼 산/캐노피
+  ui.Image? _landImage; // left land.png — 좌우 각각 한 번씩(오른쪽은 반전)
+  ui.Image? _knotImage; // knot.png — 중앙 매듭(로프 뭉치+리본), 로프 없음
+  ui.Image? _splashImage; // water splash.png — 낙하 착지 물보라
+  ui.Image? _winImage; // win.png — 승리 색종이 시트(여러 조각을 잘라 씀)
 
   /// 모터에 등장성(isotonic) 저항으로 그대로 전송되는 현재 상대 힘.
   double get aiPower => _aiPower;
@@ -167,6 +229,29 @@ class TugOfWarFlameGame extends FlameGame {
   Offset _lastKnotPos = Offset.zero; // 매듭 화면 좌표 (렌더에서 갱신)
   Offset _lastGripPos = Offset.zero; // 플레이어 손 화면 좌표
 
+  // 최종 승리 축하 연출 — 색종이/스파클이 실제로 떨어지는 걸 볼 수 있도록,
+  // 매치가 끝나도 결과 화면으로 바로 넘어가지 않고 잠깐 붙잡아 둔다.
+  // (이전엔 confetti를 스폰한 바로 다음 줄에서 _endGame을 호출해, 화면이
+  // 즉시 결과 화면으로 전환되는 바람에 색종이가 뜨는 걸 볼 새가 없었음.)
+  bool _celebrating = false;
+  double _celebrationTimer = 0;
+  static const double _celebrationDuration = 5.0; // 초
+  // 색종이/스파클은 각각 1~3초 안에 다 사그라들어서, 5초짜리 축하 연출을
+  // 한 번의 스폰만으로 채우면 뒷부분이 텅 비어 보인다. 그래서 홀드가 끝날
+  // 때까지 일정 간격으로 새로 터뜨려 계속 축하하는 느낌을 유지한다.
+  double _celebrationBurstTimer = 0;
+  static const double _celebrationBurstInterval = 0.9; // 초
+
+  // 낙하 완료 직후 홀드 — 낙하가 끝나자마자(같은 프레임에) 다음 라운드를
+  // 시작하거나 결과 화면으로 넘어가면, 방금까지 축 늘어져 있던 로프가
+  // _ropePosition=0으로 리셋되며 순간적으로 "위로 튕겨 올라가는" 것처럼
+  // 보인다. 그래서 낙하가 끝난 상태(로프가 진 쪽으로 늘어진 채 고정된
+  // 상태) 그대로 잠깐 붙잡아 뒀다가 라운드를 넘긴다 — 실제 로프가 진 쪽이
+  // 놓은 뒤 이긴 쪽 손에 늘어져 걸려 있는 것처럼 보이게.
+  bool _postFallHold = false;
+  double _postFallTimer = 0;
+  static const double _postFallHoldDuration = 1.3; // 초
+
   /// 떨어지기 연출 진행 중 여부 (모터 등장성 저항 재전송 차단용).
   bool get isFalling => _isFalling;
 
@@ -209,9 +294,80 @@ class TugOfWarFlameGame extends FlameGame {
     // Brunnstrom 단계별 필요 ROM: 한 번의 당기기/버티기에서 요구되는 가동 범위.
     // romRatio 0.4(2단계) ~ 1.0(5·6단계) → 슬라이더/센서 이동량 목표로 환산.
     _romTarget = (config.romRatio * 0.5).clamp(0.18, 0.5);
+
+    await _loadFighterSprites();
   }
 
   double _romTarget = 0.3;
+
+  /// 플레이어(player 1~4.png)·침팬지(champ 1~4.png) 실사 스프라이트 로드.
+  /// 실패해도 게임이 멈추지 않도록 개별적으로 try/catch — 실패한 쪽만 빈
+  /// 목록으로 남아 절차적 그래픽으로 대체된다.
+  Future<void> _loadFighterSprites() async {
+    Future<ui.Image> load(String name) async {
+      final data = await rootBundle.load('assets/tugofwar/$name');
+      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final frame = await codec.getNextFrame();
+      return frame.image;
+    }
+
+    try {
+      _playerFrames =
+          await Future.wait([1, 2, 3, 4].map((i) => load('player $i.png')));
+      _playerSpriteScale = _playerSpriteH / _playerFrames[0].height;
+    } catch (_) {
+      _playerFrames = [];
+    }
+    try {
+      _champFrames =
+          await Future.wait([1, 2, 3, 4].map((i) => load('champ $i.png')));
+      _champSpriteScale = _champSpriteH / _champFrames[0].height;
+    } catch (_) {
+      _champFrames = [];
+    }
+    try {
+      _gorFrames =
+          await Future.wait([1, 2, 3, 4].map((i) => load('gor $i.png')));
+      _gorSpriteScale = _gorSpriteH / _gorFrames[0].height;
+    } catch (_) {
+      _gorFrames = [];
+    }
+    try {
+      _orFrames =
+          await Future.wait([1, 2, 3, 4].map((i) => load('or $i.png')));
+      _orSpriteScale = _orSpriteH / _orFrames[0].height;
+    } catch (_) {
+      _orFrames = [];
+    }
+
+    // 배경/땅/매듭/이펙트는 서로 독립적으로 시도 — 하나가 없어도 나머지는
+    // 스프라이트로, 그 하나만 절차적 그래픽으로 자동 대체된다.
+    try {
+      _bgImage = await load('background.png');
+    } catch (_) {
+      _bgImage = null;
+    }
+    try {
+      _landImage = await load('left land.png');
+    } catch (_) {
+      _landImage = null;
+    }
+    try {
+      _knotImage = await load('knot.png');
+    } catch (_) {
+      _knotImage = null;
+    }
+    try {
+      _splashImage = await load('water splash.png');
+    } catch (_) {
+      _splashImage = null;
+    }
+    try {
+      _winImage = await load('win.png');
+    } catch (_) {
+      _winImage = null;
+    }
+  }
 
   // ── 업데이트 (모든 게임 로직은 여기에서만) ────────────────────────────────
 
@@ -225,6 +381,35 @@ class TugOfWarFlameGame extends FlameGame {
     _updateParticles(dt);
 
     if (!isRunning || _hasEnded) return;
+
+    // 낙하가 막 끝난 직후 홀드 — 로프/캐릭터를 그 상태 그대로 잠깐 유지한
+    // 뒤에야 라운드를 넘긴다(_postFallHold 필드 선언부 주석 참고).
+    if (_postFallHold) {
+      _postFallTimer -= dt;
+      if (_postFallTimer <= 0) {
+        _postFallHold = false;
+        _resolveRoundEnd();
+      }
+      return;
+    }
+
+    // 최종 승리 축하 연출 중 — 색종이/스파클이 떨어지는 걸 보여준 뒤 결과
+    // 화면으로 넘어간다. 이 동안엔 낙하/카운트다운/게임 로직을 진행하지
+    // 않는다(이미 매치가 결정됐으므로).
+    if (_celebrating) {
+      _celebrationTimer -= dt;
+      _celebrationBurstTimer -= dt;
+      if (_celebrationBurstTimer <= 0 && _celebrationTimer > 0) {
+        _celebrationBurstTimer = _celebrationBurstInterval;
+        _spawnConfetti();
+        _spawnSparkles();
+      }
+      if (_celebrationTimer <= 0) {
+        _celebrating = false;
+        _endGame(won: true);
+      }
+      return;
+    }
 
     if (_countdown > 0) {
       _countdown = (_countdown - dt).clamp(0.0, 3.0);
@@ -288,7 +473,12 @@ class TugOfWarFlameGame extends FlameGame {
     }
 
     if (_fallProgress >= 1.0) {
-      _resolveRoundEnd();
+      // 바로 _resolveRoundEnd()를 부르지 않고 잠깐 홀드한다 — _isFalling은
+      // 계속 true, _fallProgress도 1.0에 고정된 채라 로프/캐릭터가 지금
+      // "완전히 떨어진" 상태 그대로 유지된다. 홀드가 끝나면 update()가
+      // _resolveRoundEnd()를 호출한다.
+      _postFallHold = true;
+      _postFallTimer = _postFallHoldDuration;
     }
   }
 
@@ -310,8 +500,21 @@ class TugOfWarFlameGame extends FlameGame {
 
     if (matchOver) {
       final matchWon = _playerRoundWins > _animalRoundWins;
-      if (matchWon) _spawnConfetti(); // 최종 승리 색종이 (라운드 승리와 구분)
-      _endGame(won: matchWon);
+      if (matchWon) {
+        // 최종 승리: 색종이/스파클이 실제로 보이도록 잠깐 붙잡아 둔 다음
+        // 결과 화면으로 넘어간다 (update()의 _celebrating 분기 참고).
+        // _isFalling은 일부러 그대로 true로 둔다 — update()에서 _celebrating
+        // 분기가 _isFalling 검사보다 먼저 return하므로 _updateFall이 다시
+        // 실행될 일은 없고, 대신 render()가 계속 "낙하 완료(투명)" 상태로
+        // 그려 방금 떨어진 캐릭터가 다시 팝업하듯 나타나지 않는다.
+        _celebrating = true;
+        _celebrationTimer = _celebrationDuration;
+        _celebrationBurstTimer = _celebrationBurstInterval;
+        _spawnConfetti();
+        _spawnSparkles();
+      } else {
+        _endGame(won: false); // 패배는 축하 연출 없이 바로 결과 화면으로.
+      }
     } else {
       _startNextRound();
     }
@@ -363,9 +566,27 @@ class TugOfWarFlameGame extends FlameGame {
         radius: 3 + _rng.nextDouble() * 3,
       ));
     }
+
+    // 착지 물보라: 작은 물방울들 위에 water splash.png 한 장을 크게 겹쳐
+    // 그려 착지 순간을 확실히 보여준다 (스프라이트 없으면 물방울로만 표현).
+    if (!dust && _splashImage != null) {
+      _particles.add(_Particle(
+        x: x,
+        y: y,
+        vx: 0,
+        vy: -8,
+        color: Colors.white, // 이미지 파티클은 color를 쓰지 않음
+        radius: 55,
+        gravity: 0,
+        fade: 1.1,
+        image: _splashImage,
+      ));
+    }
   }
 
-  /// 승리 시 화면 위에서 쏟아지는 색종이.
+  /// 승리 시 화면 위에서 쏟아지는 반짝이는 색종이(승리 스파클).
+  /// win.png(색종이 조각이 흩어진 시트)가 로드됐으면 그 안에서 무작위 작은
+  /// 영역을 잘라 조각 텍스처로 쓰고, 없으면 단색 사각형으로 대체한다.
   void _spawnConfetti() {
     const palette = [
       Color(0xFFFFC857),
@@ -374,20 +595,56 @@ class TugOfWarFlameGame extends FlameGame {
       Color(0xFF7BE495),
       Color(0xFFC792EA),
     ];
+    final win = _winImage;
     final n = _fxCount(46);
     for (int i = 0; i < n; i++) {
+      Rect? srcRect;
+      if (win != null) {
+        const cropSize = 46.0;
+        final maxX = max(0.0, win.width - cropSize);
+        final maxY = max(0.0, win.height - cropSize);
+        srcRect = Rect.fromLTWH(
+          _rng.nextDouble() * maxX,
+          _rng.nextDouble() * maxY,
+          cropSize,
+          cropSize,
+        );
+      }
       _particles.add(_Particle(
         x: _rng.nextDouble() * size.x,
         y: -10 - _rng.nextDouble() * size.y * 0.3,
         vx: (_rng.nextDouble() * 2 - 1) * 60,
         vy: 60 + _rng.nextDouble() * 90,
         color: palette[_rng.nextInt(palette.length)],
-        radius: 3 + _rng.nextDouble() * 3,
+        radius: win != null ? 11 + _rng.nextDouble() * 5 : 3 + _rng.nextDouble() * 3,
         gravity: 40,
         fade: 0.35,
-        rect: true,
+        rect: win == null,
         angle: _rng.nextDouble() * pi,
         spin: (_rng.nextDouble() * 2 - 1) * 6,
+        image: win,
+        srcRect: srcRect,
+      ));
+    }
+  }
+
+  /// 승리 시 화면 곳곳에서 반짝이는 별빛 스파클. 색종이(_spawnConfetti)와는
+  /// 별개로, 화면에 고정된 채 짧게 깜빡이다 사라진다.
+  void _spawnSparkles() {
+    final n = _fxCount(26);
+    for (int i = 0; i < n; i++) {
+      _particles.add(_Particle(
+        x: _rng.nextDouble() * size.x,
+        y: _rng.nextDouble() * size.y * 0.75,
+        vx: 0,
+        vy: -6, // 아주 살짝 위로 떠오르며 사라짐
+        color: _rng.nextBool() ? const Color(0xFFFFF3B0) : Colors.white,
+        radius: 3 + _rng.nextDouble() * 4,
+        gravity: 0,
+        fade: 0.6 + _rng.nextDouble() * 0.7,
+        angle: _rng.nextDouble() * pi,
+        spin: (_rng.nextDouble() * 2 - 1) * 3,
+        sparkle: true,
       ));
     }
   }
@@ -596,9 +853,9 @@ class TugOfWarFlameGame extends FlameGame {
       center: Offset(px, _standY(px, w, h) - 48),
       facing: 1,
       falling: _isFalling && _isPlayerFalling,
-      strength: _pullPower,
+      strength: _poseStrength(_pullPower),
       cadence: 5.0,
-      paint: _paintHuman,
+      paint: _paintPlayer,
     );
 
     // 상대 (동물) — 오른쪽 절벽 끝에서 왼쪽(로프)을 향한다. 종류마다 체형이 다르다.
@@ -608,7 +865,7 @@ class TugOfWarFlameGame extends FlameGame {
       center: Offset(ox, _standY(ox, w, h) - 48),
       facing: -1,
       falling: _isFalling && !_isPlayerFalling,
-      strength: _aiPower,
+      strength: _poseStrength(_aiPower),
       cadence: switch (_currentAnimal) {
         AnimalType.chimpanzee => 9.0,
         AnimalType.orangutan => 2.6,
@@ -827,15 +1084,16 @@ class TugOfWarFlameGame extends FlameGame {
 
   // ── 캐릭터 위치 (지는 쪽이 상대에게 끌려간다) ────────────────────────────
   // 실제 줄다리기처럼 로프가 팽팽한 채로, 이기는 쪽이 로프를 감아 당기면 지는
-  // 쪽 사람이 중앙 쪽 한계선(_dragLimitL/R)까지 끌려온다. _ropePosition +1 =
-  // 플레이어 우세(상대가 끌려옴), -1 = 플레이어 열세(플레이어가 끌려옴).
-  // (원장님 지시로 다리에 이어 땅 사이 틈도 없애 긴장감을 더 낮췄다 — 평소엔
-  // 눈에 보이는 낭떠러지 없이 하나로 이어진 땅 위에 서 있고, 이 한계선을
-  // 넘어야만 비로소 낙하가 시작된다. 낙하 연출 중에만 계속 중앙 쪽으로
-  // 미끄러지며 땅 끝 너머 강으로 떨어진다.)
+  // 쪽 사람이 자기 땅의 안쪽(강 쪽) 가장자리(_dragLimitL/R)까지 끌려온다.
+  // _ropePosition +1 = 플레이어 우세(상대가 끌려옴), -1 = 플레이어 열세
+  // (플레이어가 끌려옴).
+  // (원장님 지시: 다리를 없애 두 땅 사이에 아무 연결도 없게 만들어야 더
+  // 긴장감 있다 — 지면 바로 발밑이 낭떠러지. 그래서 땅은 왼쪽/오른쪽에 각각
+  // 하나씩만 놓고 가운데는 강이 보이는 허공으로 비워 둔다. 가장자리를 넘는
+  // 순간 낙하 연출이 시작되어 그 허공(강)으로 떨어진다.)
   double _playerCenterX(double w) {
     final dragged = (_ropePosition < 0 ? -_ropePosition : 0.0); // 0~1
-    var x = w * 0.15 + dragged * (w * _dragLimitL - w * 0.15); // 최대치=한계선
+    var x = w * 0.15 + dragged * (w * _dragLimitL - w * 0.15); // 최대치=땅 가장자리
     if (_isFalling && _isPlayerFalling) x += _fallProgress * (w * 0.09);
     return x;
   }
@@ -847,46 +1105,58 @@ class TugOfWarFlameGame extends FlameGame {
     return x;
   }
 
-  // 지는 쪽이 낙하 전까지 최대로 끌려올 수 있는 중앙 쪽 한계선 (w 비율).
-  // 다리·틈이 없어진 뒤로는 시각적 경계가 아니라 순전히 게임플레이용 값이다.
+  // 지는 쪽이 낙하 전까지 최대로 끌려올 수 있는, 자기 땅의 안쪽(강 쪽)
+  // 가장자리 (w 비율). _landWidthFrac(0.34)보다 살짝 안쪽이라 캐릭터가
+  // 절대 땅 밖으로 발을 내밀고 서 있는 것처럼 보이지 않는다.
   static const double _dragLimitL = 0.30;
   static const double _dragLimitR = 0.70;
 
   double _standY(double x, double w, double h) => h * 0.63;
 
-  // ── 배경: 정글 + 강 + 이어진 땅 ──────────────────────────────────────────
+  // ── 배경: 정글 + 강 + 좌우로 분리된 두 땅(가운데는 허공) ────────────────
   // 인지 레벨(bgComplexity 0/1/2)에 따라 장식 요소를 단계적으로 줄인다.
   void _drawCanyon(Canvas canvas, double w, double h) {
     final detail = config.cognitiveLevel.bgComplexity; // 0=단순 ~ 2=풍부
+    final bg = _bgImage;
 
-    // 하늘/캐노피 그라데이션
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, w, h),
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF35564A), Color(0xFF223438), Color(0xFF16232A)],
-          stops: [0.0, 0.55, 1.0],
-        ).createShader(Rect.fromLTWH(0, 0, w, h)),
-    );
-
-    // 먼 정글 실루엣 (풍부 레벨에서만)
-    if (detail >= 2) {
-      final canopy = Paint()
-        ..color = const Color(0xFF3B5A48).withValues(alpha: 0.5);
-      for (int i = 0; i <= 6; i++) {
-        final cx = w * (i / 6.0);
-        canvas.drawCircle(Offset(cx, h * 0.16), h * 0.11, canopy);
-        canvas.drawCircle(Offset(cx + w * 0.08, h * 0.23), h * 0.09, canopy);
-      }
-    }
-    // 옅은 안개 띠 (보통 레벨 이상)
-    if (detail >= 1) {
-      canvas.drawRect(
-        Rect.fromLTWH(0, h * 0.40, w, h * 0.24),
-        Paint()..color = const Color(0xFFAEC6C0).withValues(alpha: 0.09),
+    if (bg != null) {
+      // 하늘/먼 산/캐노피 스프라이트를 화면 전체에 늘려 채운다.
+      canvas.drawImageRect(
+        bg,
+        Rect.fromLTWH(0, 0, bg.width.toDouble(), bg.height.toDouble()),
+        Rect.fromLTWH(0, 0, w, h),
+        Paint()..filterQuality = FilterQuality.medium,
       );
+    } else {
+      // 절차적 대체: 하늘/캐노피 그라데이션
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, w, h),
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF35564A), Color(0xFF223438), Color(0xFF16232A)],
+            stops: [0.0, 0.55, 1.0],
+          ).createShader(Rect.fromLTWH(0, 0, w, h)),
+      );
+
+      // 먼 정글 실루엣 (풍부 레벨에서만)
+      if (detail >= 2) {
+        final canopy = Paint()
+          ..color = const Color(0xFF3B5A48).withValues(alpha: 0.5);
+        for (int i = 0; i <= 6; i++) {
+          final cx = w * (i / 6.0);
+          canvas.drawCircle(Offset(cx, h * 0.16), h * 0.11, canopy);
+          canvas.drawCircle(Offset(cx + w * 0.08, h * 0.23), h * 0.09, canopy);
+        }
+      }
+      // 옅은 안개 띠 (보통 레벨 이상)
+      if (detail >= 1) {
+        canvas.drawRect(
+          Rect.fromLTWH(0, h * 0.40, w, h * 0.24),
+          Paint()..color = const Color(0xFFAEC6C0).withValues(alpha: 0.09),
+        );
+      }
     }
 
     // 협곡 아래 강
@@ -920,30 +1190,86 @@ class TugOfWarFlameGame extends FlameGame {
     _drawGround(canvas, w, h, detail: detail);
   }
 
-  /// 하나로 이어진 지면 — 이전에는 좌우 절벽 사이에 강이 보이는 틈이 있었지만,
-  /// 원장님 지시로 그 틈을 없애 화면 전체 너비를 잇는 하나의 땅으로 만들었다.
-  /// 강은 이 땅 아래(리버 라인부터 화면 끝까지)를 따라 그대로 흐른다 — 지는
-  /// 쪽은 여전히 중앙으로 끌려오다 땅 끝 너머로 떨어져 강에 빠지며(낙하 연출·
-  /// 물보라 그대로 유지), 다만 평소에는 눈에 보이는 '틈'이 없어 덜 위협적이다.
+  // 각 땅이 차지하는 화면 폭 비율. _dragLimitL/R(0.30/0.70)보다 살짝 넓게
+  // 잡아, 지는 쪽이 최대로 끌려와도 시각적으로 여전히 땅 위에 서 있다.
+  static const double _landWidthFrac = 0.34;
+
+  /// 좌우로 분리된 두 땅. left land.png를 왼쪽엔 그대로, 오른쪽엔 좌우
+  /// 반전해서 화면 가장자리에 한 번씩만 놓는다 — 서로 잇지 않고 가운데는
+  /// _drawCanyon이 이미 그린 강/배경이 그대로 보이는 허공으로 남긴다.
   void _drawGround(Canvas canvas, double w, double h, {required int detail}) {
     final topY = h * 0.63;
-    final riverTop = h * 0.85;
+    final land = _landImage;
+    final landW = w * _landWidthFrac;
 
-    // 땅(바위) — 풀밭 아래부터 강 수면 위까지, 화면 전체 너비.
-    final rock = Rect.fromLTWH(0, topY - 6, w, riverTop - (topY - 6));
-    canvas.drawRect(rock, Paint()..color = const Color(0xFF3B322A));
-    canvas.drawRect(
+    if (land != null) {
+      final tileH = h - (topY - 6); // 풀밭 라인부터 화면 맨 아래까지
+      // left land.png는 위쪽 ~16%가 듬성듬성한 잎사귀 끝(투명 배경 위)이고,
+      // 실제로 꽉 찬 잔디 표면은 그보다 아래에서 시작한다(실측: 높이 353px
+      // 중 약 56px 지점부터 폭이 거의 꽉 참). 이 여백을 그대로 스트레치하면
+      // "꽉 찬 땅"이 실제 화면상 topY보다 한참 아래에서 시작해, 그 위에 서는
+      // 캐릭터 발이 잔디 위 허공에 떠 있는 것처럼 보인다. 그래서 소스에서
+      // 이 여백을 잘라내고 꽉 찬 부분만 목적지(topY-6 ~ 화면 맨 아래)에
+      // 채운다 — 캐릭터 발밑 그림자 높이(topY)와 잔디 표면이 맞아떨어진다.
+      const marginFrac = 56 / 353;
+      final srcTop = land.height * marginFrac;
+      final src = Rect.fromLTWH(
+          0, srcTop, land.width.toDouble(), land.height - srcTop);
+      final paint = Paint()..filterQuality = FilterQuality.medium;
+
+      // 왼쪽 땅 — 화면 왼쪽 가장자리에 딱 한 번.
+      canvas.drawImageRect(
+          land, src, Rect.fromLTWH(0, topY - 6, landW, tileH), paint);
+
+      // 오른쪽 땅 — 같은 이미지를 좌우 반전해 오른쪽 가장자리에 딱 한 번.
+      canvas.save();
+      canvas.translate(w, 0);
+      canvas.scale(-1, 1);
+      canvas.drawImageRect(
+          land, src, Rect.fromLTWH(0, topY - 6, landW, tileH), paint);
+      canvas.restore();
+      return;
+    }
+
+    // 절차적 대체 — 좌우 각각 절벽 하나씩, 가운데는 비워 강이 그대로 보인다.
+    _drawProceduralCliff(canvas, w, h, left: true, width: landW, detail: detail);
+    _drawProceduralCliff(canvas, w, h,
+        left: false, width: landW, detail: detail);
+  }
+
+  void _drawProceduralCliff(Canvas canvas, double w, double h,
+      {required bool left, required double width, required int detail}) {
+    final topY = h * 0.63;
+    final x0 = left ? 0.0 : w - width;
+    final edgeX = left ? width : w - width; // 안쪽(강 쪽) 가장자리
+    final outX = left ? -2.0 : w + 2;
+    final dir = left ? 1.0 : -1.0;
+    const steps = 7;
+
+    // 바위 덩어리 — 안쪽 가장자리를 지그재그로 깎아 절벽 느낌.
+    final rock = Path()..moveTo(outX, topY - 6);
+    for (int i = 0; i <= steps; i++) {
+      final t = i / steps;
+      final y = topY + t * (h - topY + 4);
+      final jag = (i.isEven ? 12.0 : -4.0) * dir + sin(i * 2.0) * 4 * dir;
+      rock.lineTo(edgeX + jag, y);
+    }
+    rock
+      ..lineTo(outX, h + 2)
+      ..close();
+    canvas.drawPath(rock, Paint()..color = const Color(0xFF3B322A));
+    canvas.drawPath(
       rock,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4
+        ..strokeWidth = 6
         ..color = const Color(0xFF2A231D),
     );
 
     // 풀 덮인 윗면
-    canvas.drawRect(Rect.fromLTWH(0, topY - 6, w, 12),
+    canvas.drawRect(Rect.fromLTWH(x0, topY - 6, width, 12),
         Paint()..color = const Color(0xFF497A3C));
-    canvas.drawRect(Rect.fromLTWH(0, topY - 6, w, 4),
+    canvas.drawRect(Rect.fromLTWH(x0, topY - 6, width, 4),
         Paint()..color = const Color(0xFF5FA04D));
 
     if (detail >= 1) {
@@ -951,23 +1277,23 @@ class TugOfWarFlameGame extends FlameGame {
         ..color = const Color(0xFF5FA04D)
         ..strokeWidth = 2
         ..strokeCap = StrokeCap.round;
-      for (int i = 0; i < 16; i++) {
-        final bx = w * (i + 0.5) / 16;
+      for (int i = 0; i < 6; i++) {
+        final bx = x0 + width * (i + 0.5) / 6;
         final lean = (i.isEven ? 1 : -1) * 3.0;
         canvas.drawLine(
             Offset(bx, topY - 2), Offset(bx + lean, topY + 7), blade);
       }
     }
 
-    // 강가로 늘어진 덩굴 (풍부 레벨에서만)
+    // 매달린 덩굴 (풍부 레벨에서만)
     if (detail >= 2) {
       final vine = Paint()
         ..color = const Color(0xFF3C6B3A)
         ..strokeWidth = 2.5
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
-      for (int i = 0; i < 5; i++) {
-        final vx = w * (i + 1) / 6;
+      for (int i = 0; i < 3; i++) {
+        final vx = edgeX + dir * (6.0 + i * 12);
         final sway = sin(_elapsedSeconds * 1.2 + i) * 4;
         canvas.drawPath(
           Path()
@@ -988,23 +1314,45 @@ class TugOfWarFlameGame extends FlameGame {
   // 전체가 균일하게 처진다 — 지는 쪽만 느슨해지지 않는다(오히려 끌려가는 쪽이
   // 더 팽팽하다). 실제로 축 늘어지는 건 이미 떨어진 사람 쪽 구간뿐이다.
   void _drawRope(Canvas canvas, double w, double h) {
-    // 손 높이는 각 파이터가 서 있는 지형(_standY) 위쪽 — 다리 가운데로 끌려온
-    // 쪽은 손도 그만큼 아래로 내려간다.
+    // 손 위치는 _drawFighter가 실제로 그릴 때 쓰는 것과 똑같은 변환(안간힘
+    // 젖힘 회전 + 낙하 기울임/축소)을 그대로 적용해 계산한다 — 그래야
+    // 캐릭터가 뒤로 젖혀지거나 낙하로 기울어질 때도 로프가 항상 손을
+    // 따라간다(_handWorldPos 참고).
     final pcx = _playerCenterX(w), ocx = _opponentCenterX(w);
-    var leftHand = Offset(pcx + 22, _standY(pcx, w, h) - 54);
-    var rightHand = Offset(ocx - 22, _standY(ocx, w, h) - 54);
+    final playerCenter = Offset(pcx, _standY(pcx, w, h) - 48);
+    final opponentCenter = Offset(ocx, _standY(ocx, w, h) - 48);
+    final oppCfg = _opponentSpriteConfig();
 
-    // 낙하 연출: 진 쪽 손이 캐릭터를 따라 아래로 내려가며 그 구간만 축 늘어진다.
-    double fallenSlack = 0;
-    if (_isFalling) {
-      fallenSlack = 70 * _fallProgress;
-      final drop = _fallProgress * h * 0.9;
-      if (_isPlayerFalling) {
-        leftHand = Offset(leftHand.dx, leftHand.dy + drop);
-      } else {
-        rightHand = Offset(rightHand.dx, rightHand.dy + drop);
-      }
-    }
+    final leftHand = _handWorldPos(
+      center: playerCenter,
+      facing: 1,
+      falling: _isFalling && _isPlayerFalling,
+      strength: _poseStrength(_pullPower),
+      cadence: 5.0,
+      frames: _playerFrames,
+      scale: _playerSpriteScale,
+      fracX: _playerHandFracX,
+      fracY: _playerHandFracY,
+    );
+    final rightHand = _handWorldPos(
+      center: opponentCenter,
+      facing: -1,
+      falling: _isFalling && !_isPlayerFalling,
+      strength: _poseStrength(_aiPower),
+      cadence: switch (_currentAnimal) {
+        AnimalType.chimpanzee => 9.0,
+        AnimalType.orangutan => 2.6,
+        AnimalType.gorilla => 1.7,
+      },
+      frames: oppCfg?.frames,
+      scale: oppCfg?.scale,
+      fracX: oppCfg?.fracX,
+      fracY: oppCfg?.fracY,
+    );
+
+    // 낙하 연출: 진 쪽 로프 구간만 추가로 축 늘어진다(손 위치 자체는 이미
+    // 위 _handWorldPos가 낙하 기울임/하강을 반영해 계산했다).
+    final fallenSlack = _isFalling ? 70 * _fallProgress : 0.0;
 
     // 매듭 위치: t=0 플레이어 손, t=1 상대 손. 플레이어가 우세할수록(+1) 매듭이
     // 플레이어 쪽(t 작음)으로 감겨온다.
@@ -1034,7 +1382,11 @@ class TugOfWarFlameGame extends FlameGame {
     _lastGripPos = leftHand;
   }
 
-  /// 한쪽 로프 구간을 2차 베지어로 그린다: 굵은 외곽선 → 밝은 심 → 꼬임 눈금.
+  /// 한쪽 로프 구간을 2차 베지어를 따라 절차적으로 그린다: 굵은 외곽선 →
+  /// 밝은 심 → 꼬임 눈금. (rope.png 스프라이트는 작은 타일을 이어 붙이는
+  /// 스탬프 방식이 이음새가 도드라져 당분간 쓰지 않기로 했다 — 위 필드
+  /// 선언부 주석 참고. 손 앵커(_playerHandFracX/Y 등)가 정확해 스프라이트
+  /// 캐릭터의 맞잡은 손 바로 위로 이 로프가 자연스럽게 이어진다.)
   void _drawRopeSegment(Canvas canvas, Offset a, Offset b, double sag) {
     // 중점을 sag 만큼 끌어내리도록 제어점 y 를 2*sag 로.
     final ctrl = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2 + sag * 2);
@@ -1042,41 +1394,72 @@ class TugOfWarFlameGame extends FlameGame {
       ..moveTo(a.dx, a.dy)
       ..quadraticBezierTo(ctrl.dx, ctrl.dy, b.dx, b.dy);
 
+    // 그림자 — 살짝 아래로 오프셋한 흐린 선으로 로프가 허공에 걸려 있는
+    // 입체감을 준다.
+    canvas.save();
+    canvas.translate(0, 3);
     canvas.drawPath(
       path,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 12
+        ..strokeWidth = 13
         ..strokeCap = StrokeCap.round
-        ..color = const Color(0xFF6E4A21),
+        ..color = Colors.black.withValues(alpha: 0.14),
+    );
+    canvas.restore();
+
+    // 외곽선(어두운 갈색) → 중간 톤 몸통. 두 가닥이 감아 도는 무늬는 아래
+    // strand 루프에서 따로 그려 원통형 꼬임을 표현한다.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 13
+        ..strokeCap = StrokeCap.round
+        ..color = const Color(0xFF5C3B1E),
     );
     canvas.drawPath(
       path,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 8
+        ..strokeWidth = 10
         ..strokeCap = StrokeCap.round
-        ..color = const Color(0xFFD8B27C),
+        ..color = const Color(0xFFB98A4E),
     );
 
-    // 꼬임(twist) 눈금: 곡선을 따라가며 접선에 기울인 짧은 어두운 선.
-    final twist = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = const Color(0xFF9C6B34);
-    const steps = 22;
-    for (int i = 1; i < steps; i++) {
-      final t = i / steps;
-      final p = _quad(a, ctrl, b, t);
-      final tan = _quadTangent(a, ctrl, b, t);
-      final len = tan.distance == 0 ? 1.0 : tan.distance;
-      // 접선을 살짝 회전시킨 방향으로 눈금을 그어 새끼줄 느낌.
-      final nx = (tan.dx * 0.5 - tan.dy) / len;
-      final ny = (tan.dy * 0.5 + tan.dx) / len;
-      canvas.drawLine(
-        Offset(p.dx - nx * 4, p.dy - ny * 4),
-        Offset(p.dx + nx * 4, p.dy + ny * 4),
-        twist,
+    // 두 가닥이 서로 꼬이며 로프 몸통을 감아 도는 모양 — 곡선을 따라가며
+    // 접선에 수직인 방향으로 사인파처럼 좌우로 오가는 얇은 줄무늬 두 개를
+    // (반 바퀴 어긋나게) 그린다.
+    final len = (b - a).distance + sag.abs();
+    final turns = (len / 16).clamp(3.0, 40.0);
+    const steps = 40;
+    for (int strand = 0; strand < 2; strand++) {
+      final strandPath = Path();
+      for (int i = 0; i <= steps; i++) {
+        final t = i / steps;
+        final p = _quad(a, ctrl, b, t);
+        final tan = _quadTangent(a, ctrl, b, t);
+        final tlen = tan.distance == 0 ? 1.0 : tan.distance;
+        final nx = -tan.dy / tlen, ny = tan.dx / tlen; // 접선의 법선(수직) 방향
+        final phase = t * turns * 2 * pi + (strand == 0 ? 0 : pi);
+        final off = sin(phase) * 3.2; // 로프 두께 안에서 좌우로 왔다갔다
+        final px = p.dx + nx * off;
+        final py = p.dy + ny * off;
+        if (i == 0) {
+          strandPath.moveTo(px, py);
+        } else {
+          strandPath.lineTo(px, py);
+        }
+      }
+      canvas.drawPath(
+        strandPath,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.2
+          ..strokeCap = StrokeCap.round
+          ..color = strand == 0
+              ? const Color(0xFF7A5226).withValues(alpha: 0.85)
+              : const Color(0xFFE0B878).withValues(alpha: 0.7),
       );
     }
   }
@@ -1088,11 +1471,38 @@ class TugOfWarFlameGame extends FlameGame {
     canvas.translate(c.dx, c.dy);
     canvas.rotate(sin(_elapsedSeconds * 3.0) * (0.05 + (1.0 - tension) * 0.05));
 
-    // 그림자
+    final knotImg = _knotImage;
+
+    // 그림자 — knot.png 사용 시 실제 매듭 크기(아래 targetW)에 맞춰 작게.
     canvas.drawOval(
-      Rect.fromCenter(center: const Offset(0, 6), width: 30, height: 12),
+      Rect.fromCenter(
+        center: const Offset(0, 6),
+        width: knotImg != null ? 16 : 30,
+        height: knotImg != null ? 7 : 12,
+      ),
       Paint()..color = Colors.black.withValues(alpha: 0.22),
     );
+
+    if (knotImg != null) {
+      // 로프(굵기 12px 내외) 옆에서 너무 커 보이지 않도록 실측 크기보다
+      // 훨씬 작게(폭 22px) 그린다 — knot.png는 위쪽 ~40%가 둥근 매듭 뭉치,
+      // 아래 ~60%는 늘어진 리본이다(실측: 128px 중 매듭 중심은 약 27px
+      // 지점). 이미지 전체를 (0,0)에 중앙 정렬하면 매듭 뭉치가 로프보다
+      // 한참 위로 뜨므로, 매듭 중심이 정확히 로프 지점(로컬 (0,0))에 오도록
+      // 세로 위치를 보정한다.
+      const targetW = 22.0;
+      final targetH = targetW * (knotImg.height / knotImg.width);
+      const ballCenterFrac = 27 / 128; // 매듭 뭉치 중심의 세로 비율(실측)
+      canvas.drawImageRect(
+        knotImg,
+        Rect.fromLTWH(0, 0, knotImg.width.toDouble(), knotImg.height.toDouble()),
+        Rect.fromLTWH(
+            -targetW / 2, -targetH * ballCenterFrac, targetW, targetH),
+        Paint()..filterQuality = FilterQuality.medium,
+      );
+      canvas.restore();
+      return;
+    }
 
     // 둥근 매듭 덩어리
     canvas.drawCircle(Offset.zero, 13, Paint()..color = const Color(0xFFB07C3F));
@@ -1183,6 +1593,56 @@ class TugOfWarFlameGame extends FlameGame {
     required double cadence,
     required void Function(Canvas c, double heave, double effort) paint,
   }) {
+    final pose = _computeFighterPose(
+        facing: facing, falling: falling, strength: strength, cadence: cadence);
+    if (pose.alpha <= 0) return;
+
+    // 발밑 그림자 (월드 공간, 회전 영향 없음)
+    if (!falling || _fallProgress < 0.4) {
+      canvas.drawOval(
+        Rect.fromCenter(
+            center: Offset(center.dx, center.dy + 48), width: 62, height: 14),
+        Paint()..color = Colors.black.withValues(alpha: 0.20 * pose.alpha),
+      );
+    }
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy + pose.dy);
+    canvas.rotate(pose.lean * facing); // 월드 공간 젖힘 (facing 으로 방향 보정)
+    canvas.scale(facing * pose.scale, pose.scale); // 좌우 반전 + 낙하 축소
+    if (pose.alpha < 1.0) {
+      canvas.saveLayer(
+        const Rect.fromLTRB(-150, -170, 150, 170),
+        Paint()..color = Colors.white.withValues(alpha: pose.alpha.clamp(0.0, 1.0)),
+      );
+      paint(canvas, pose.heave, pose.effort);
+      canvas.restore();
+    } else {
+      paint(canvas, pose.heave, pose.effort);
+    }
+    canvas.restore();
+  }
+
+  /// 승부가 이미 결정된 동안(낙하 중/낙하 직후 홀드/최종 승리 축하 연출)에는
+  /// 이긴 쪽 자세 계산에 쓰는 strength를 0으로 죽인다. 그렇지 않으면 승리를
+  /// 확정짓는 마지막 순간의 (거의 최대치인) 힘 값이 그대로 얼어붙어, 이긴
+  /// 쪽이 계속 "온 힘을 다해 안간힘 쓰는" 극단적인 포즈(프레임4)로 멈춰
+  /// 있게 되고 — 그 포즈에서는 실측 그립 비율이 딱 맞지 않아 로프 끝이
+  /// 손에서 벗어나 보인다. 승부가 끝났으니 이긴 쪽은 차분한 자세(프레임1에
+  /// 가까움, 그립 정렬이 가장 잘 맞는 포즈)로 쉬는 게 자연스럽기도 하다.
+  double _poseStrength(double raw) =>
+      (_isFalling || _postFallHold || _celebrating) ? 0.0 : raw;
+
+  /// 파이터의 자세(젖힘/낙하 기울임/흔들림/스케일/힘씀 정도)를 계산한다.
+  /// _drawFighter가 실제로 그릴 때, _handWorldPos가 로프 손 위치를 미리
+  /// 계산할 때 둘 다 이 함수를 써서 — 두 계산이 항상 정확히 일치한다.
+  ({double dy, double lean, double scale, double alpha, double heave, double effort})
+      _computeFighterPose({
+    required int facing,
+    required bool falling,
+    required double strength,
+    required double cadence,
+  }) {
     double dy = 0, lean = 0, scale = 1.0, alpha = 1.0, heave = 0, effort = 0;
 
     if (falling) {
@@ -1199,6 +1659,14 @@ class TugOfWarFlameGame extends FlameGame {
         scale = 1.0 - t * 0.75;
         alpha = 1.0 - t * 0.7;
       } else {
+        // 캐릭터 자체는 안 보이지만(alpha=0), 로프 손 앵커는 이 pose를 계속
+        // 참조한다(_handWorldPos). 여기서 dy/scale을 안 채우면 기본값(0,
+        // 1.0=평소 서 있는 자세)으로 되돌아가 버려서, 착지 단계(p>=0.8)로
+        // 넘어가는 순간 로프가 "평소 손 위치"로 순간이동한 것처럼 위로
+        // 튀어 오르는 버그가 있었다. p=0.8 시점의 최종값(다 가라앉고 다
+        // 줄어든 상태)을 그대로 이어받아야 로프가 계속 가라앉은 채로 있다.
+        dy = 12 + 96 * 4;
+        scale = 0.25;
         alpha = 0;
       }
     } else if (_countdown <= 0) {
@@ -1217,32 +1685,94 @@ class TugOfWarFlameGame extends FlameGame {
       dy = -osc.abs() * (1.5 + effort * 2.0);
     }
 
-    if (alpha <= 0) return;
+    return (dy: dy, lean: lean, scale: scale, alpha: alpha, heave: heave, effort: effort);
+  }
 
-    // 발밑 그림자 (월드 공간, 회전 영향 없음)
-    if (!falling || _fallProgress < 0.4) {
-      canvas.drawOval(
-        Rect.fromCenter(
-            center: Offset(center.dx, center.dy + 48), width: 62, height: 14),
-        Paint()..color = Colors.black.withValues(alpha: 0.20 * alpha),
-      );
-    }
+  /// 로프가 잡는 손의 월드 좌표. _drawFighter가 캐릭터를 그릴 때 적용하는
+  /// 변환(translate → rotate(lean) → scale)을 로컬 그립 포인트에 그대로
+  /// 적용해서 구한다 — 그래서 안간힘으로 뒤로 젖혀지거나 낙하로 기울어져도
+  /// 로프가 항상 정확히 손 위치에서 시작한다.
+  Offset _handWorldPos({
+    required Offset center,
+    required int facing,
+    required bool falling,
+    required double strength,
+    required double cadence,
+    List<ui.Image>? frames,
+    double? scale,
+    double? fracX,
+    double? fracY,
+  }) {
+    final pose = _computeFighterPose(
+        facing: facing, falling: falling, strength: strength, cadence: cadence);
 
-    canvas.save();
-    canvas.translate(center.dx, center.dy + dy);
-    canvas.rotate(lean * facing); // 월드 공간 젖힘 (facing 으로 방향 보정)
-    canvas.scale(facing * scale, scale); // 좌우 반전 + 낙하 축소
-    if (alpha < 1.0) {
-      canvas.saveLayer(
-        const Rect.fromLTRB(-150, -170, 150, 170),
-        Paint()..color = Colors.white.withValues(alpha: alpha.clamp(0.0, 1.0)),
-      );
-      paint(canvas, heave, effort);
-      canvas.restore();
+    Offset local;
+    if (frames != null &&
+        frames.isNotEmpty &&
+        scale != null &&
+        fracX != null &&
+        fracY != null) {
+      final img = frames[_frameIndex(pose.effort)];
+      local = _spriteGripLocal(img, scale, fracX, fracY);
     } else {
-      paint(canvas, heave, effort);
+      local = const Offset(23, -6); // 절차적 그래픽용 기존 고정 앵커
     }
-    canvas.restore();
+
+    // canvas.scale(facing*scale, scale) 다음 canvas.rotate(lean*facing) 순서를
+    // 그대로 재현 (역순으로 적용하면 결과가 달라지므로 순서 주의).
+    final sx = local.dx * facing * pose.scale;
+    final sy = local.dy * pose.scale;
+    final theta = pose.lean * facing;
+    final cosT = cos(theta), sinT = sin(theta);
+    final rx = sx * cosT - sy * sinT;
+    final ry = sx * sinT + sy * cosT;
+    return Offset(center.dx + rx, center.dy + pose.dy + ry);
+  }
+
+  /// 스프라이트 캐릭터의 그립(맞잡은 손) 로컬 좌표. 발이 지면(로컬 y=48,
+  /// _drawFighter의 발밑 그림자와 같은 높이)에 닿도록 이미지를 배치했을 때,
+  /// handFracX/Y 비율에 해당하는 이미지 내부 지점이 로컬 공간 어디에 오는지
+  /// 계산한다. _drawSpriteFighter의 배치 방식과 반드시 일치해야 한다.
+  Offset _spriteGripLocal(
+      ui.Image img, double scale, double handFracX, double handFracY) {
+    final w = img.width * scale;
+    final h = img.height * scale;
+    const groundY = 48.0;
+    final left = -w / 2;
+    final top = groundY - h;
+    return Offset(left + w * handFracX, top + h * handFracY);
+  }
+
+  /// 현재 상대 동물의 스프라이트 자원(프레임/배율/그립 비율)을 반환한다.
+  /// 스프라이트가 없으면(로드 실패) null — 이 경우 절차적 그래픽으로 대체.
+  ({List<ui.Image> frames, double scale, double fracX, double fracY})?
+      _opponentSpriteConfig() {
+    switch (_currentAnimal) {
+      case AnimalType.chimpanzee:
+        if (_champFrames.isEmpty) return null;
+        return (
+          frames: _champFrames,
+          scale: _champSpriteScale,
+          fracX: _champHandFracX,
+          fracY: _champHandFracY,
+        );
+      case AnimalType.orangutan:
+        if (_orFrames.isEmpty) return null;
+        return (
+          frames: _orFrames,
+          scale: _orSpriteScale,
+          fracX: _orHandFracX,
+          fracY: _orHandFracY,
+        );
+      case AnimalType.gorilla:
+        if (_gorFrames.isEmpty) return null;
+        return (
+          frames: _gorFrames,
+          scale: _gorSpriteScale,
+          fracX: _gorHandFracX,
+          fracY: _gorHandFracY,
+        );
+    }
   }
 
   /// 파이터 팔다리용 둥근 끝 굵은 선.
@@ -1280,7 +1810,39 @@ class TugOfWarFlameGame extends FlameGame {
     }
   }
 
-  /// 사람(플레이어) — 오른쪽(로프)을 향해 두 팔을 뻗어 버티는 자세.
+  /// 효과 강도(effort, 0~1)를 4단계 프레임 인덱스(0~3)로 변환한다. 숫자가
+  /// 클수록(=player/champ 4.png) 더 세게 힘을 쓰는 자세.
+  int _frameIndex(double effort) => (effort * 4).floor().clamp(0, 3);
+
+  /// 실사 스프라이트 한 프레임을 그린다. 발이 지면(로컬 y=48, 발밑 그림자와
+  /// 같은 높이)에 닿도록 배치하고, 고정 배율(scale, 1번 프레임 기준으로 한
+  /// 번만 계산됨)을 그대로 써서 포즈가 바뀌어도 캐릭터 크기가 흔들리지
+  /// 않는다. 스프라이트는 항상 오른쪽(로프)을 보도록 제작되어 있어,
+  /// _drawFighter가 이미 적용한 facing 반전을 그대로 물려받는다.
+  void _drawSpriteFighter(Canvas c, ui.Image img, double scale, double effort) {
+    final w = img.width * scale;
+    final h = img.height * scale;
+    const groundY = 48.0;
+    final dst = Rect.fromLTWH(-w / 2, groundY - h, w, h);
+    final src = Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
+    c.drawImageRect(
+        img, src, dst, Paint()..filterQuality = FilterQuality.medium);
+    _strainFx(c, effort);
+  }
+
+  /// 플레이어 — 스프라이트가 로드됐으면 effort에 맞는 실사 프레임을, 아니면
+  /// 기존 절차적 그래픽(_paintHuman)을 대신 그린다.
+  void _paintPlayer(Canvas c, double heave, double effort) {
+    if (_playerFrames.isEmpty) {
+      _paintHuman(c, heave, effort);
+      return;
+    }
+    _drawSpriteFighter(
+        c, _playerFrames[_frameIndex(effort)], _playerSpriteScale, effort);
+  }
+
+  /// 사람(플레이어) 절차적 그래픽 — player 1~4.png 로드 실패 시 대체용.
+  /// 오른쪽(로프)을 향해 두 팔을 뻗어 버티는 자세.
   void _paintHuman(Canvas c, double heave, double effort) {
     final skin =
         Color.lerp(const Color(0xFFE8B98C), const Color(0xFFD87E63), effort * 0.55)!;
@@ -1339,19 +1901,26 @@ class TugOfWarFlameGame extends FlameGame {
     c.drawCircle(grip, 5, Paint()..color = skin);
   }
 
-  /// 상대 동물 — 종류에 따라 완전히 다른 체형/자세로 그린다.
+  /// 상대 동물 — 스프라이트가 있으면 effort에 맞는 실사 프레임을, 없으면
+  /// 절차적 그래픽을 그린다.
   void _paintAnimal(Canvas c, double heave, double effort) {
-    switch (_currentAnimal) {
-      case AnimalType.chimpanzee:
-        _paintChimp(c, heave, effort);
-      case AnimalType.orangutan:
-        _paintOrangutan(c, heave, effort);
-      case AnimalType.gorilla:
-        _paintGorilla(c, heave, effort);
+    final cfg = _opponentSpriteConfig();
+    if (cfg == null) {
+      switch (_currentAnimal) {
+        case AnimalType.chimpanzee:
+          _paintChimp(c, heave, effort);
+        case AnimalType.orangutan:
+          _paintOrangutan(c, heave, effort);
+        case AnimalType.gorilla:
+          _paintGorilla(c, heave, effort);
+      }
+      return;
     }
+    _drawSpriteFighter(c, cfg.frames[_frameIndex(effort)], cfg.scale, effort);
   }
 
-  /// 침팬지 — 작고 웅크린 체형, 긴 팔, 큰 귀. 빠르고 불규칙하게 당긴다.
+  /// 침팬지 절차적 그래픽 — champ 1~4.png 로드 실패 시 대체용. 작고 웅크린
+  /// 체형, 긴 팔, 큰 귀. 빠르고 불규칙하게 당긴다.
   void _paintChimp(Canvas c, double heave, double effort) {
     const fur = Color(0xFF2C2420);
     final skin =
@@ -1520,8 +2089,56 @@ class TugOfWarFlameGame extends FlameGame {
   void _drawParticles(Canvas canvas) {
     for (final p in _particles) {
       final a = p.life.clamp(0.0, 1.0);
+      final img = p.image;
+      if (img != null) {
+        // 스프라이트 파티클(물보라 조각/색종이 조각) — 크기는 고정, 투명도만
+        // life에 따라 줄어든다. srcRect가 있으면 시트에서 그 영역만 자른다.
+        final src = p.srcRect ??
+            Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
+        final targetW = p.radius * 2 * p.scale;
+        final targetH = targetW * (src.height / src.width);
+        canvas.save();
+        canvas.translate(p.x, p.y);
+        canvas.rotate(p.angle);
+        canvas.drawImageRect(
+          img,
+          src,
+          Rect.fromCenter(center: Offset.zero, width: targetW, height: targetH),
+          Paint()
+            ..color = Colors.white.withValues(alpha: a)
+            ..filterQuality = FilterQuality.medium,
+        );
+        canvas.restore();
+        continue;
+      }
+
       final paint = Paint()..color = p.color.withValues(alpha: a);
-      if (p.rect) {
+      if (p.sparkle) {
+        // 네 꼭짓점 별 모양 — 짧은 십자형 반짝임. 중심에 작은 밝은 코어를
+        // 더해 반짝이는 느낌을 강조한다.
+        canvas.save();
+        canvas.translate(p.x, p.y);
+        canvas.rotate(p.angle);
+        final r = p.radius * a;
+        final star = Path();
+        for (int k = 0; k < 4; k++) {
+          final outerA = k * pi / 2;
+          final innerA = outerA + pi / 4;
+          final op = Offset(cos(outerA) * r, sin(outerA) * r);
+          final ip = Offset(cos(innerA) * r * 0.35, sin(innerA) * r * 0.35);
+          if (k == 0) {
+            star.moveTo(op.dx, op.dy);
+          } else {
+            star.lineTo(op.dx, op.dy);
+          }
+          star.lineTo(ip.dx, ip.dy);
+        }
+        star.close();
+        canvas.drawPath(star, paint);
+        canvas.drawCircle(Offset.zero, r * 0.28,
+            Paint()..color = Colors.white.withValues(alpha: a));
+        canvas.restore();
+      } else if (p.rect) {
         canvas.save();
         canvas.translate(p.x, p.y);
         canvas.rotate(p.angle);

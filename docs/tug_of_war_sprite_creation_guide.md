@@ -249,3 +249,142 @@ Once saved, tell Claude the assets are ready — pubspec registration through th
 | `onLoad()` sprite-loading code | Claude |
 | Swapping `render()` procedural drawing for sprites | Claude |
 | Frame-switching logic timed to the pull cycle | Claude |
+
+---
+
+## 9. Detached arm/hand rig (2-joint IK) — replaces the 4-pose sheets
+
+**Why**: the 4-pose sheet approach (player/champ/gor/or 1–4.png) bakes the arm into the same
+flat image as the body, at a fixed angle per pose. No matter how precisely the grip point is
+measured (see §5's frame-by-frame PIL marking), the rope can only ever touch that one fixed
+point in that one fixed pose — it visibly detaches the moment the character leans, trembles,
+or falls, because the body is leaning/rotating but the baked-in arm angle isn't. A **detached
+arm** fixes this at the root: the shoulder and elbow become two independently rotatable joints
+that the game code drives every frame (a real 2-bone forward-kinematics chain), so the hand
+position is *computed*, not measured off a photo — it can be aimed exactly at the rope's true
+anchor point at all times, at any lean angle, with no per-pose guesswork.
+
+This replaces the 4 "effort" pose frames per character with **3 static pieces** per character
+(body, upper arm, forearm+hand) — 12 files total instead of 16, and no animation-video step
+needed for these (§5's video-loop workflow is no longer needed for arms; keep it only if you
+still want a body idle-sway loop, which is optional).
+
+### 9.1 Required pieces (per character: player, champ, gor, or)
+
+| File | Content | Notes |
+|------|---------|------|
+| `<name>_body.png` | Torso + head + legs, tug-of-war bracing stance, **no arm at all** | Shoulder shown as a rounded stub/socket (like a sleeve or shoulder fur) so the upper-arm piece overlaps it cleanly |
+| `<name>_upperarm.png` | Shoulder-to-elbow segment only, in a straight neutral rest pose | Shoulder pivot at the **top-center edge** of the canvas |
+| `<name>_forearm.png` | Elbow-to-fist segment, ending in a hand gripping an (invisible/implied) rope | Elbow pivot at the **top-center edge** of the canvas |
+
+### 9.2 Shared style prefix (put this in front of every prompt)
+
+```
+2D mobile game character illustration, clean smooth vector-style outlines (not thick comic
+ink), soft cel shading, vibrant natural colors, semi-realistic cartoon proportions — matching
+the style of an existing tug-of-war game character sprite (bracing/leaning stance, gripping a
+rope with both hands).
+```
+
+### 9.3 Pivot convention (critical — repeat this in every arm/forearm prompt)
+
+```
+The limb must be drawn perfectly straight, pointing straight down from the top edge of the
+canvas like a plumb line. Its pivot joint (the shoulder for the upper arm, the elbow for the
+forearm) must sit exactly at the top-center of the canvas, touching or almost touching the top
+edge — not in the middle of the image. Transparent background. No perspective foreshortening,
+even/flat lighting along the limb's length (it will be rotated by software afterward, so
+directional shading baked in one direction will look wrong at other angles).
+```
+
+AI image generators won't hit this pixel-perfect — treat it as a strong bias, not a guarantee.
+After generating, use the same technique as §"how these hand-fractions were measured" earlier
+in this doc (a quick Python/PIL script drawing a crosshair at a candidate pivot point, viewed
+and adjusted until it lines up) to find the *actual* pivot pixel in the delivered image, then
+tell Claude that pixel offset — the rendering code needs it to rotate around the right point.
+
+### 9.4 Per-character prompts
+
+**Player (human) body** — `player_body.png`
+```
+[style prefix]
+A determined young adult woman, ponytail, blue short-sleeve shirt and dark green pants,
+bracing tug-of-war stance seen from a fixed side profile facing right, back leg extended for
+leverage, front leg bent, shoulders squared toward the right with two short rounded shoulder
+stubs where the arms attach — no arms or hands drawn, torso and head only otherwise complete,
+transparent background, no shadow on the ground.
+```
+
+**Player arm** — `player_upperarm.png` / `player_forearm.png`
+```
+[style prefix] [pivot convention]
+A single human arm segment matching the player character's skin tone and blue sleeve (for the
+upper arm) / bare forearm (for the forearm), toned but not overly muscular.
+```
+For the forearm specifically, add:
+```
+The lower end (opposite the elbow pivot) ends in a clenched fist as if gripping a thick rope —
+fingers wrapped around a rope-width gap, thumb over the top, angled so the grip reads correctly
+when the whole limb is rotated to any angle.
+```
+
+**Chimpanzee body** — `champ_body.png`
+```
+[style prefix]
+A small, hunched cartoon chimpanzee, dark brown-black fur, large round ears, crouched low
+tug-of-war stance facing right, two short rounded shoulder stubs where the long arms attach —
+no arms or hands drawn, transparent background, expressive face.
+```
+
+**Chimpanzee arm** — `champ_upperarm.png` / `champ_forearm.png`
+```
+[style prefix] [pivot convention]
+A single long chimpanzee arm segment, dark brown-black fur, matching the chimpanzee body's fur
+texture and tone.
+```
+Forearm gets the same rope-gripping-fist addition as above, in fur-covered chimp-hand form.
+
+**Orangutan body** — `or_body.png`
+```
+[style prefix]
+A round, shaggy cartoon orangutan, reddish-brown fur, wide cheek flanges, heavy round belly,
+short bent legs, tug-of-war stance facing right, two short rounded shoulder stubs where the
+very long arms attach — no arms or hands drawn, transparent background.
+```
+
+**Orangutan arm** — `or_upperarm.png` / `or_forearm.png`
+```
+[style prefix] [pivot convention]
+A single very long orangutan arm segment, reddish-brown shaggy fur, matching the orangutan
+body's fur texture and tone.
+```
+Forearm gets the rope-gripping-fist addition, fur-covered orangutan hand.
+
+**Gorilla body** — `gor_body.png`
+```
+[style prefix]
+A massive muscular cartoon gorilla, black fur with a silver-gray patch on its back, broad
+shoulders, small crested head, short thick legs, intimidating but cartoon-cute, tug-of-war
+stance facing right, two short rounded shoulder stubs where the thick arms attach — no arms or
+hands drawn, transparent background.
+```
+
+**Gorilla arm** — `gor_upperarm.png` / `gor_forearm.png`
+```
+[style prefix] [pivot convention]
+A single thick gorilla arm segment, black fur, matching the gorilla body's fur texture and
+tone.
+```
+Forearm gets the rope-gripping-fist addition, fur-covered gorilla fist.
+
+### 9.5 After generating
+
+1. Background-remove + save each piece into `assets/tugofwar/` using the exact filenames above.
+2. Tell Claude the pieces are ready. Claude will: measure each piece's true pivot pixel (§9.3),
+   rewire `_drawFighter`/`_paintPlayer`/`_paintAnimal` to draw body + a 2-joint rotated arm
+   instead of a single flat sprite, and drive the shoulder/elbow angles from `effort`/`heave`
+   (and, going forward, could even solve the angles via inverse kinematics so the hand always
+   lands exactly on the rope, however it sags).
+3. The old `player/champ/gor/or 1~4.png` 4-pose sheets can stay in the folder unused, or be
+   deleted once the arm rig is confirmed working — Claude's loader will simply stop requesting
+   them.

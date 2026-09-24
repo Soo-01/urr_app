@@ -144,6 +144,8 @@ flutter:
     - assets/shield/
     # Shield Guard Game audio
     - assets/audio/sheild_guard/
+    # Tug of War Game sprites (player + chimpanzee, effort frames 1~4)
+    - assets/tugofwar/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
