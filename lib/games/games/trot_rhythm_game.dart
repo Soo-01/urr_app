@@ -15,7 +15,7 @@ import '../game_result_screen.dart';
 
 // ============================================================================
 // [E4] 트로트 콘서트 응원 게임 (Trot Concert Cheer)
-// 관절: 어깨 굽힘/폄 (lShoulderEF) — 지금은 어깨 1자유도. 팔꿈치(2자유도)는 추후.
+// 관절: 오른쪽 어깨 굽힘/폄 (rShoulderEF) — PART 코드는 허브가 넘기는 config.bodyPart를 쓴다.
 // 메카닉: 응원단장의 응원봉 동작을 따라하기 (천천히 넓게 → 빠르게 좁게)
 // 씬: 가수(무대) + 응원단장(중앙) + 관객(좌우) + 플레이어(하단 중앙)
 // Phase 1: 스프라이트 없이 Canvas 도형으로 구현
@@ -886,8 +886,8 @@ class _TrotRhythmGameState extends State<TrotRhythmGame> {
 
     if (!_isSim) {
       try {
-        widget.bluetoothService
-            .sendBytes(Uint8List.fromList(utf8.encode('PART:lShoulderEF\n')));
+        widget.bluetoothService.sendBytes(
+            Uint8List.fromList(utf8.encode('PART:${widget.config.bodyPart}\n')));
         Future.delayed(const Duration(milliseconds: 100), () {
           widget.bluetoothService
               .sendBytes(Uint8List.fromList(utf8.encode('arom\n')));
