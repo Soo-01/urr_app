@@ -484,6 +484,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trotRhythmDesc => 'Hit the beat with your elbow';
 
   @override
+  String get tugOfWar => 'Tug of War';
+
+  @override
+  String get tugOfWarDesc => 'Tug of War Description';
+
+  @override
   String get rehabGames => 'Rehab Games';
 
   @override

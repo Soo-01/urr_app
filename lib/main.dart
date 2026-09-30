@@ -20,7 +20,8 @@ void main() {
     //   create: (context) => LocaleProvider(),
     //   child: const MyApp(),
     // ),
-    MultiProvider( // ChangeNotifierProvider를 MultiProvider로 변경
+    MultiProvider(
+      // ChangeNotifierProvider를 MultiProvider로 변경
       providers: [
         ChangeNotifierProvider(create: (context) => LocaleProvider()),
         ChangeNotifierProvider(create: (context) => FontSizeProvider()),
@@ -51,19 +52,27 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 236, 239, 106)),  // 255, 236, 239, 106
+        colorScheme: ColorScheme.fromSeed(
+            seedColor:
+                const Color.fromARGB(255, 236, 239, 106)), // 255, 236, 239, 106
         useMaterial3: true,
         iconTheme: IconThemeData(size: 30 * fontSizeProvider.scaleFactor),
       ),
       home: BottomNavBar(bluetoothService: bluetoothService),
       routes: {
-       '/home': (context) => BottomNavBar(bluetoothService: bluetoothService),
-        '/profile': (context) => BottomNavBar(bluetoothService: bluetoothService),
-        '/mode select': (context) => BottomNavBar(bluetoothService: bluetoothService),
-        '/rom mode': (context) => BottomNavBar(bluetoothService: bluetoothService),
-        '/control': (context) => BottomNavBar(bluetoothService: bluetoothService),
-        '/file_upload': (context) => BottomNavBar(bluetoothService: bluetoothService),
-        '/information': (context) => BottomNavBar(bluetoothService: bluetoothService),
+        '/home': (context) => BottomNavBar(bluetoothService: bluetoothService),
+        '/profile': (context) =>
+            BottomNavBar(bluetoothService: bluetoothService),
+        '/mode select': (context) =>
+            BottomNavBar(bluetoothService: bluetoothService),
+        '/rom mode': (context) =>
+            BottomNavBar(bluetoothService: bluetoothService),
+        '/control': (context) =>
+            BottomNavBar(bluetoothService: bluetoothService),
+        '/file_upload': (context) =>
+            BottomNavBar(bluetoothService: bluetoothService),
+        '/information': (context) =>
+            BottomNavBar(bluetoothService: bluetoothService),
 
         // '/profile': (context) => const ProfileScreen(),
         // '/information': (context) => const Information(),
@@ -82,7 +91,6 @@ class FontSizeProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-
 
 class LocaleProvider extends ChangeNotifier {
   // Locale _locale = const Locale('en'); // 언어 기본값
@@ -108,7 +116,7 @@ class LocaleProvider extends ChangeNotifier {
 
 class HomeScreen extends StatefulWidget {
   final BluetoothService bluetoothService;
- const HomeScreen({super.key, required this.bluetoothService});
+  const HomeScreen({super.key, required this.bluetoothService});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -138,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-  
+
     Future.microtask(() async {
       try {
         await widget.bluetoothService.requestPermissions();
@@ -146,11 +154,10 @@ class _HomeScreenState extends State<HomeScreen> {
         debugPrint("❌ 권한 요청 실패: $e");
       }
     });
-  
+
     _loadBatteryLevel();
     _loadConnectionHistory();
   }
-
 
   void _loadBatteryLevel() async {
     final level = await _batteryService.getBatteryLevel();
@@ -170,11 +177,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void _loadConnectionHistory() async {
     final prefs = await SharedPreferences.getInstance();
     final keys = prefs.getKeys();
-    
+
     for (var key in keys) {
       // 1. 데이터를 타입에 상관없이 일단 가져옵니다.
       final value = prefs.get(key);
-      
+
       // 2. 만약 그 데이터가 숫자(int) 타입이라면 _connectionHistory에 넣습니다.
       // (우리가 저장한 측정 기록 String 데이터는 여기서 자연스럽게 무시됩니다!)
       if (value is int) {
@@ -183,19 +190,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-
   void _startScan() async {
     setState(() {
       _discoveredDevices.clear();
       _scanning = true;
     });
 
-    _discoveryStream = widget.bluetoothService.startDiscovery().listen((result) {
-      final exists = _discoveredDevices.any((d) => d.device.address == result.device.address);
+    _discoveryStream =
+        widget.bluetoothService.startDiscovery().listen((result) {
+      final exists = _discoveredDevices
+          .any((d) => d.device.address == result.device.address);
       if (!exists) {
         setState(() {
           _discoveredDevices.add(result);
-          _discoveredDevices.sort((a,b) {
+          _discoveredDevices.sort((a, b) {
             final countA = _connectionHistory[a.device.address] ?? 0;
             final countB = _connectionHistory[b.device.address] ?? 0;
             return countB.compareTo(countA);
@@ -218,14 +226,14 @@ class _HomeScreenState extends State<HomeScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context)!.bluetoothDisconnected),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(
-              top: 10,
-              left: 20,
-              right: 20,
-            )
-          ),
+              content:
+                  Text(AppLocalizations.of(context)!.bluetoothDisconnected),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.only(
+                top: 10,
+                left: 20,
+                right: 20,
+              )),
         );
       });
 
@@ -247,21 +255,25 @@ class _HomeScreenState extends State<HomeScreen> {
       await _flutterTts.setPitch(1.0);
       await _flutterTts.speak(
         localeCode == 'ko' ? '블루투스가 연결되었습니다.' : 'Bluetooth Device Connected',
-    );
+      );
 
       await _flutterTts.awaitSpeakCompletion(true);
       await Future.delayed(const Duration(seconds: 10));
       await _flutterTts.speak(
         localeCode == 'ko' ? '준비되었습니다.' : 'Ready',
-    );
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.connectedTo(device.name ?? "Unknown")),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!
+              .connectedTo(device.name ?? "Unknown")),
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.connectionFailed(e.toString()))),
+        SnackBar(
+            content: Text(
+                AppLocalizations.of(context)!.connectionFailed(e.toString()))),
       );
     }
   }
@@ -273,7 +285,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await _flutterTts.setLanguage(ttsLanguage);
   }
 
- 
   @override
   void dispose() {
     _discoveryStream?.cancel();
@@ -300,11 +311,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            _bluetoothConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-                            color: _bluetoothConnected ? Colors.blue : Colors.red,
+                            _bluetoothConnected
+                                ? Icons.bluetooth_connected
+                                : Icons.bluetooth_disabled,
+                            color:
+                                _bluetoothConnected ? Colors.blue : Colors.red,
                           ),
                           const SizedBox(width: 8),
-                          Text(_bluetoothConnected ? AppLocalizations.of(context)!.bluetoothConnected : AppLocalizations.of(context)!.bluetoothDisconnected),
+                          Text(_bluetoothConnected
+                              ? AppLocalizations.of(context)!.bluetoothConnected
+                              : AppLocalizations.of(context)!
+                                  .bluetoothDisconnected),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -313,13 +330,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Text(AppLocalizations.of(context)!.scanDevices),
                       ),
                       if (_connectedDevice != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Text(
-                          AppLocalizations.of(context)!.connectedTo(_connectedDevice!.name ?? "Unknown"),
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            AppLocalizations.of(context)!.connectedTo(
+                                _connectedDevice!.name ?? "Unknown"),
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -355,9 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-
           const Divider(),
-
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             child: Row(
@@ -366,7 +383,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Language Toggle - 왼쪽 정렬
                 Consumer<LocaleProvider>(
                   builder: (context, localeProvider, child) {
-                    final isEnglish = localeProvider.locale.languageCode == 'en';
+                    final isEnglish =
+                        localeProvider.locale.languageCode == 'en';
                     return Row(
                       children: [
                         const Icon(Icons.language),
@@ -374,11 +392,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         Switch(
                           value: isEnglish,
                           onChanged: (val) {
-                            final newLocale = val ? const Locale('en') : const Locale('ko');
+                            final newLocale =
+                                val ? const Locale('en') : const Locale('ko');
                             localeProvider.setLocale(newLocale);
                           },
                         ),
-                        Text(isEnglish ? AppLocalizations.of(context)!.languageEnglish : AppLocalizations.of(context)!.languageKorean),
+                        Text(isEnglish
+                            ? AppLocalizations.of(context)!.languageEnglish
+                            : AppLocalizations.of(context)!.languageKorean),
                       ],
                     );
                   },
@@ -399,7 +420,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             });
                           },
                         ),
-                        Text(_motorPower ? AppLocalizations.of(context)!.on : AppLocalizations.of(context)!.off),
+                        Text(_motorPower
+                            ? AppLocalizations.of(context)!.on
+                            : AppLocalizations.of(context)!.off),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -408,7 +431,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         const Icon(Icons.battery_full),
                         const SizedBox(width: 8),
-                        Text(AppLocalizations.of(context)!.battery(_batteryLevel)),
+                        Text(AppLocalizations.of(context)!
+                            .battery(_batteryLevel)),
                       ],
                     ),
                   ],
@@ -420,12 +444,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}   
-
-
+}
 
 //////////////////////////////////////////////////////
-
 
 // // --- 유저 정보 관리를 위한 Provider ---
 // class UserProvider extends ChangeNotifier {
@@ -435,7 +456,7 @@ class _HomeScreenState extends State<HomeScreen> {
 //   double height = 0.0;
 //   double weight = 0.0;
 //   String arm = "Right";
-//   double armLength = 0.0; 
+//   double armLength = 0.0;
 //   double forearmLength = 0.0;
 
 //   // 전체 저장된 유저 데이터 (이름을 Key로 저장)
@@ -468,7 +489,7 @@ class _HomeScreenState extends State<HomeScreen> {
 //   void deleteUser(String userName) {
 //     if (allSavedUsers.containsKey(userName)) {
 //       allSavedUsers.remove(userName);
-      
+
 //       // 만약 현재 화면에 표시된 유저를 지운 것이라면 화면 정보도 초기화 (선택 사항)
 //       if (name == userName) {
 //         name = "N/A";
@@ -479,33 +500,35 @@ class _HomeScreenState extends State<HomeScreen> {
 //         forearmLength = 0.0;
 //         // 다른 필드들도 초기값으로 세팅...
 //       }
-      
+
 //       notifyListeners(); // 리스트 업데이트 알림
 //     }
 //   }
 // }
 
-
-
-
 // --- 유저 정보 관리를 위한 Provider ---
 class UserProvider extends ChangeNotifier {
   // 1. 기본 유저 정보
-  String name = " ";  // No Name
+  String name = " "; // No Name
   String gender = "Male";
   double age = 0.0;
   double height = 0.0;
   double weight = 0.0;
   String arm = "Right";
-  double armLength = 0.0; 
+  double armLength = 0.0;
   double forearmLength = 0.0;
 
   // 2. ROM 측정 데이터 (PROM / AROM 분리 저장)
   // PROM: 관절(part), 속도(velocity), 최소각도(minAngle), 최대각도(maxAngle)
-  Map<String, dynamic>? promData; 
-  
+  Map<String, dynamic>? promData;
+
   // AROM: 관절(part), 최소각도(minAngle), 최대각도(maxAngle)
   Map<String, dynamic>? aromData;
+
+  // Latest PROM or AROM for every measured joint.
+  Map<String, Map<String, dynamic>> romMeasurements = {};
+  Map<String, Map<String, dynamic>> promMeasurements = {};
+  Map<String, Map<String, dynamic>> aromMeasurements = {};
 
   // 3. 운동 기록 데이터 (CPM, Isometric, Isotonic 훈련 기록 저장 리스트)
   List<Map<String, dynamic>> userRecords = [];
@@ -513,41 +536,136 @@ class UserProvider extends ChangeNotifier {
   // 전체 저장된 유저 데이터 (이름을 Key로 저장)
   Map<String, Map<String, dynamic>> allSavedUsers = {};
 
+  bool get hasRegisteredProfile =>
+      name.trim().isNotEmpty && allSavedUsers.containsKey(name);
+
+  bool get hasAnyRomMeasurement =>
+      promMeasurements.isNotEmpty ||
+      aromMeasurements.isNotEmpty ||
+      romMeasurements.isNotEmpty ||
+      promData != null ||
+      aromData != null;
+
+  Map<String, dynamic>? promForPart(String part) {
+    final saved = promMeasurements[part];
+    if (saved != null) return Map<String, dynamic>.from(saved);
+    if (promData?['part'] == part) {
+      return {...promData!, 'mode': 'PROM'};
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? aromForPart(String part) {
+    final saved = aromMeasurements[part];
+    if (saved != null) return Map<String, dynamic>.from(saved);
+    if (aromData?['part'] == part) {
+      return {...aromData!, 'mode': 'AROM'};
+    }
+    return null;
+  }
+
+  /// Returns the narrower of the saved PROM and AROM ranges for [part].
+  Map<String, dynamic>? measuredRomForPart(String part) {
+    final candidates = <Map<String, dynamic>>[
+      if (promForPart(part) case final prom?) prom,
+      if (aromForPart(part) case final arom?) arom,
+    ];
+    if (candidates.isEmpty && romMeasurements[part] != null) {
+      candidates.add(Map<String, dynamic>.from(romMeasurements[part]!));
+    }
+    if (candidates.isEmpty) return null;
+    candidates.sort((a, b) => _romWidth(a).compareTo(_romWidth(b)));
+    return candidates.first;
+  }
+
+  double _romWidth(Map<String, dynamic> measurement) {
+    final min = (measurement['minAngle'] as num).toDouble();
+    final max = (measurement['maxAngle'] as num).toDouble();
+    return (max - min).abs();
+  }
+
+  Map<String, Map<String, dynamic>> _decodeMeasurementMap(Object? raw) {
+    final result = <String, Map<String, dynamic>>{};
+    if (raw is Map) {
+      for (final entry in raw.entries) {
+        if (entry.value is Map) {
+          result[entry.key.toString()] =
+              Map<String, dynamic>.from(entry.value as Map);
+        }
+      }
+    }
+    return result;
+  }
+
   // 데이터 저장 함수
-  void saveUser(String n, String g, double a, double h, double w, String ar, double al, double fal, String pw) {
+  void saveUser(String n, String g, double a, double h, double w, String ar,
+      double al, double fal, String pw) {
     // 기존 유저 데이터가 있다면 기록(records)과 각 측정 데이터(PROM, AROM)를 유지하고, 없다면 빈 값으로 초기화
-    List<Map<String, dynamic>> existingRecords = allSavedUsers[n]?['records'] ?? [];
+    List<Map<String, dynamic>> existingRecords =
+        allSavedUsers[n]?['records'] ?? [];
     Map<String, dynamic>? existingProm = allSavedUsers[n]?['promData'];
     Map<String, dynamic>? existingArom = allSavedUsers[n]?['aromData'];
+    final existingMeasurements = <String, Map<String, dynamic>>{};
+    final rawMeasurements = allSavedUsers[n]?['romMeasurements'];
+    if (rawMeasurements is Map) {
+      for (final entry in rawMeasurements.entries) {
+        if (entry.value is Map) {
+          existingMeasurements[entry.key.toString()] =
+              Map<String, dynamic>.from(entry.value as Map);
+        }
+      }
+    }
+    final existingPromMeasurements =
+        _decodeMeasurementMap(allSavedUsers[n]?['promMeasurements']);
+    final existingAromMeasurements =
+        _decodeMeasurementMap(allSavedUsers[n]?['aromMeasurements']);
+    if (existingProm != null && existingProm['part'] is String) {
+      existingPromMeasurements.putIfAbsent(
+        existingProm['part'] as String,
+        () => {...existingProm, 'mode': 'PROM'},
+      );
+    }
+    if (existingArom != null && existingArom['part'] is String) {
+      existingAromMeasurements.putIfAbsent(
+        existingArom['part'] as String,
+        () => {...existingArom, 'mode': 'AROM'},
+      );
+    }
 
     allSavedUsers[n] = {
-      'name': n, 
-      'gender': g, 
-      'age': a, 
-      'height': h, 
-      'weight': w, 
-      'arm': ar, 
-      'armLength': al, 
-      'forearmLength': fal, 
+      'name': n,
+      'gender': g,
+      'age': a,
+      'height': h,
+      'weight': w,
+      'arm': ar,
+      'armLength': al,
+      'forearmLength': fal,
       'password': pw,
-      'records': existingRecords, 
-      'promData': existingProm,   
-      'aromData': existingArom,   
+      'records': existingRecords,
+      'promData': existingProm,
+      'aromData': existingArom,
+      'romMeasurements': existingMeasurements,
+      'promMeasurements': existingPromMeasurements,
+      'aromMeasurements': existingAromMeasurements,
     };
 
     // 현재 활성화된 정보 업데이트
-    name = n; 
-    gender = g; 
-    age = a; 
-    height = h; 
-    weight = w; 
-    armLength = al; 
-    forearmLength = fal; 
+    name = n;
+    gender = g;
+    age = a;
+    height = h;
+    weight = w;
+    armLength = al;
+    forearmLength = fal;
     arm = ar;
     userRecords = existingRecords;
     promData = existingProm;
     aromData = existingArom;
-    
+    romMeasurements = existingMeasurements;
+    promMeasurements = existingPromMeasurements;
+    aromMeasurements = existingAromMeasurements;
+
     notifyListeners();
   }
 
@@ -561,11 +679,39 @@ class UserProvider extends ChangeNotifier {
     arm = data['arm'];
     armLength = (data['armLength'] ?? 0.0).toDouble();
     forearmLength = (data['forearmLength'] ?? 0.0).toDouble();
-    
+
     // 사용자를 불러올 때 해당 사용자의 기록 및 PROM/AROM 데이터도 함께 불러오기
     userRecords = List<Map<String, dynamic>>.from(data['records'] ?? []);
-    promData = data['promData'] != null ? Map<String, dynamic>.from(data['promData']) : null;
-    aromData = data['aromData'] != null ? Map<String, dynamic>.from(data['aromData']) : null;
+    promData = data['promData'] != null
+        ? Map<String, dynamic>.from(data['promData'])
+        : null;
+    aromData = data['aromData'] != null
+        ? Map<String, dynamic>.from(data['aromData'])
+        : null;
+    romMeasurements = {};
+    final rawMeasurements = data['romMeasurements'];
+    if (rawMeasurements is Map) {
+      for (final entry in rawMeasurements.entries) {
+        if (entry.value is Map) {
+          romMeasurements[entry.key.toString()] =
+              Map<String, dynamic>.from(entry.value as Map);
+        }
+      }
+    }
+    promMeasurements = _decodeMeasurementMap(data['promMeasurements']);
+    aromMeasurements = _decodeMeasurementMap(data['aromMeasurements']);
+    if (promData != null && promData!['part'] is String) {
+      promMeasurements.putIfAbsent(
+        promData!['part'] as String,
+        () => {...promData!, 'mode': 'PROM'},
+      );
+    }
+    if (aromData != null && aromData!['part'] is String) {
+      aromMeasurements.putIfAbsent(
+        aromData!['part'] as String,
+        () => {...aromData!, 'mode': 'AROM'},
+      );
+    }
 
     notifyListeners();
   }
@@ -574,7 +720,7 @@ class UserProvider extends ChangeNotifier {
   void deleteUser(String userName) {
     if (allSavedUsers.containsKey(userName)) {
       allSavedUsers.remove(userName);
-      
+
       // 만약 현재 화면에 표시된 유저를 지운 것이라면 화면 정보도 초기화
       if (name == userName) {
         name = " ";
@@ -585,15 +731,19 @@ class UserProvider extends ChangeNotifier {
         forearmLength = 0.0;
         promData = null;
         aromData = null;
+        romMeasurements = {};
+        promMeasurements = {};
+        aromMeasurements = {};
         userRecords = [];
       }
-      
-      notifyListeners(); 
+
+      notifyListeners();
     }
   }
 
   // 4. PROM 업데이트 메서드 (선택 관절, 속도, 각도 범위)
-  void updateProm(String part, String velocity, double minAngle, double maxAngle) {
+  void updateProm(
+      String part, String velocity, double minAngle, double maxAngle) {
     promData = {
       'part': part,
       'velocity': velocity,
@@ -601,9 +751,18 @@ class UserProvider extends ChangeNotifier {
       'maxAngle': maxAngle,
       'date': DateTime.now().toString(),
     };
-    
+    romMeasurements[part] = {
+      ...promData!,
+      'mode': 'PROM',
+    };
+    promMeasurements[part] = Map<String, dynamic>.from(romMeasurements[part]!);
+
     if (allSavedUsers.containsKey(name)) {
       allSavedUsers[name]!['promData'] = promData;
+      allSavedUsers[name]!['romMeasurements'] =
+          Map<String, Map<String, dynamic>>.from(romMeasurements);
+      allSavedUsers[name]!['promMeasurements'] =
+          Map<String, Map<String, dynamic>>.from(promMeasurements);
     }
     notifyListeners();
   }
@@ -616,9 +775,18 @@ class UserProvider extends ChangeNotifier {
       'maxAngle': maxAngle,
       'date': DateTime.now().toString(),
     };
-    
+    romMeasurements[part] = {
+      ...aromData!,
+      'mode': 'AROM',
+    };
+    aromMeasurements[part] = Map<String, dynamic>.from(romMeasurements[part]!);
+
     if (allSavedUsers.containsKey(name)) {
       allSavedUsers[name]!['aromData'] = aromData;
+      allSavedUsers[name]!['romMeasurements'] =
+          Map<String, Map<String, dynamic>>.from(romMeasurements);
+      allSavedUsers[name]!['aromMeasurements'] =
+          Map<String, Map<String, dynamic>>.from(aromMeasurements);
     }
     notifyListeners();
   }
@@ -626,7 +794,7 @@ class UserProvider extends ChangeNotifier {
   // 6. 운동 기록 추가 메서드 (운동 모드 종류에 따라 다른 Map 구조를 유연하게 수용)
   // void addRecord(Map<String, dynamic> record) {
   //   userRecords.add(record);
-    
+
   //   if (allSavedUsers.containsKey(name)) {
   //     allSavedUsers[name]!['records'] = userRecords;
   //   }
@@ -636,12 +804,13 @@ class UserProvider extends ChangeNotifier {
   void addRecord(Map<String, dynamic> record) {
     // 기존 리스트의 복사본을 만들고 거기에 새 기록을 추가하여 확실하게 누적시킴
     userRecords = List<Map<String, dynamic>>.from(userRecords)..add(record);
-    
+
     // 전체 저장소(allSavedUsers) 맵에도 복사본을 업데이트
     if (allSavedUsers.containsKey(name)) {
-      allSavedUsers[name]!['records'] = List<Map<String, dynamic>>.from(userRecords);
+      allSavedUsers[name]!['records'] =
+          List<Map<String, dynamic>>.from(userRecords);
     }
-    
+
     notifyListeners();
   }
 }

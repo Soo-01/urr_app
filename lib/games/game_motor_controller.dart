@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import '../bluetooth.dart';
+import '../robot_protocol.dart';
 
 /// 게임↔모터 브리지 클래스.
 /// 게임에서 모터 명령을 안전하게 전송하고, BT 연결 상태를 감시한다.
@@ -18,7 +19,8 @@ class GameMotorController {
 
   /// 모터 저항/속도 상한선 (하드코딩 안전 제한)
   static const double maxResistance = 5.0;
-  static const double maxCpmVelocity = 10.0;
+  static const double minCpmVelocity = 0.01;
+  static const double maxCpmVelocity = 0.10;
   static const double maxIsometricHoldTime = 10.0;
 
   GameMotorController({required this.bt});
@@ -36,25 +38,46 @@ class GameMotorController {
 
   // ─── 모터 모드 시작 ───
 
-  Future<bool> startCPM(double maxAngle, double minAngle, {double velocity = 3.0}) async {
-    velocity = velocity.clamp(1.0, maxCpmVelocity);
+  Future<bool> startCPM(double maxAngle, double minAngle,
+      {double velocity = 0.05}) async {
+    velocity = velocity.clamp(minCpmVelocity, maxCpmVelocity);
     _currentMode = 'cpm';
     _motorActive = true;
-    return _send('cpm,$maxAngle,$minAngle\n');
+    return _send('${RobotProtocol.cpmForPart(
+      partCode: _currentJoint,
+      minDegrees: minAngle,
+      maxDegrees: maxAngle,
+      speedRadPerSec: velocity,
+    )}\n');
   }
 
   Future<bool> startIsometric(double targetAngle, double holdTime) async {
     holdTime = holdTime.clamp(1.0, maxIsometricHoldTime);
     _currentMode = 'isometric';
     _motorActive = true;
-    return _send('isometric,$targetAngle,$holdTime\n');
+    return _send('${RobotProtocol.isometricForPart(
+      partCode: _currentJoint,
+      targetDegrees: targetAngle,
+      holdSeconds: holdTime,
+    )}\n');
   }
 
-  Future<bool> startIsotonic(double resistance) async {
+  Future<bool> startIsotonic(double resistance,
+      {double targetAngle = 0.0}) async {
     resistance = resistance.clamp(0.0, maxResistance);
     _currentMode = 'isotonic';
     _motorActive = true;
-    return _send('isotonic,$resistance\n');
+    return _send('${RobotProtocol.isotonicForPart(
+      partCode: _currentJoint,
+      targetDegrees: targetAngle,
+      resistanceKg: resistance,
+    )}\n');
+  }
+
+  Future<bool> startArom() async {
+    _currentMode = 'arom';
+    _motorActive = true;
+    return _send('${RobotProtocol.arom}\n');
   }
 
   // ─── 정지 ───
@@ -96,7 +119,8 @@ class GameMotorController {
         return;
       }
       if (_motorActive && _lastDataReceived != null) {
-        final elapsed = DateTime.now().difference(_lastDataReceived!).inMilliseconds;
+        final elapsed =
+            DateTime.now().difference(_lastDataReceived!).inMilliseconds;
         if (elapsed > watchdogTimeoutMs) {
           emergencyStop();
         }
@@ -117,10 +141,11 @@ class GameMotorController {
   // ─── 각도 스트림 (정규화 전 raw) ───
 
   /// 게임용 raw 각도 스트림 (String → double)
-  Stream<double> get angleStream => bt.dataStream
-      .map((s) => double.tryParse(s.trim()))
-      .where((v) => v != null)
-      .cast<double>();
+  Stream<double> get angleStream => bt.telemetryStream
+      .map((frame) => frame.jointForPart(_currentJoint))
+      .where((joint) => joint != null && joint.online)
+      .map((joint) =>
+          RobotProtocol.toUiDegrees(_currentJoint, joint!.positionDegrees));
 
   // ─── 내부 ───
 
