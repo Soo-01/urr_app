@@ -64,6 +64,50 @@ void main() {
       expect(RobotProtocol.toUiDegrees('rShoulderEF', -30), 30);
       expect(RobotProtocol.toUiDegrees('rShoulderRo', -30), -30);
     });
+
+    test('maps UI speed levels to PROM and CPM motor speeds', () {
+      const expectedSpeeds = [
+        0.05,
+        0.140,
+        0.227,
+        0.314,
+        0.401,
+        0.489,
+        0.576,
+        0.663,
+        0.750,
+        0.838,
+      ];
+
+      for (var index = 0; index < expectedSpeeds.length; index++) {
+        expect(
+          RobotProtocol.speedLevelToRadPerSec('${index + 1}'),
+          expectedSpeeds[index],
+        );
+      }
+
+      expect(
+        RobotProtocol.prom(
+          speedRadPerSec: RobotProtocol.speedLevelToRadPerSec('2'),
+        ),
+        'prom,0.14',
+      );
+      expect(
+        RobotProtocol.cpm(
+          minDegrees: 10,
+          maxDegrees: 90,
+          speedRadPerSec: RobotProtocol.speedLevelToRadPerSec('10'),
+        ),
+        'cpm,10,90,0.838',
+      );
+
+      expect(
+          () => RobotProtocol.speedLevelToRadPerSec('0'), throwsArgumentError);
+      expect(
+        () => RobotProtocol.speedLevelToRadPerSec('11'),
+        throwsArgumentError,
+      );
+    });
   });
 
   test('parses joint state JSON and converts radians to degrees', () {

@@ -143,13 +143,26 @@ class RobotProtocol {
         resistanceKg: resistanceKg,
       );
 
-  /// UI speed levels 1..10 map to a conservative 0.01..0.10 rad/s.
+  /// Motor speeds (rad/s) for UI speed levels 1 through 10.
+  static const List<double> _speedRadPerSecByLevel = [
+    0.05,
+    0.140,
+    0.227,
+    0.314,
+    0.401,
+    0.489,
+    0.576,
+    0.663,
+    0.750,
+    0.838,
+  ];
+
   static double speedLevelToRadPerSec(String level) {
     final value = int.tryParse(level);
-    if (value == null || value < 1 || value > 10) {
+    if (value == null || value < 1 || value > _speedRadPerSecByLevel.length) {
       throw ArgumentError.value(level, 'level', 'Expected 1 through 10');
     }
-    return value / 100.0;
+    return _speedRadPerSecByLevel[value - 1];
   }
 
   static String _number(double value) {
